@@ -1,0 +1,16 @@
+{
+  "name": "sonmal",
+  "productName": "손말 첫걸음",
+  "version": "1.0.0",
+  "description": "웹캠 손 인식으로 배우는 한국수어 지문자 연습 프로그램",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "selftest": "electron . --selftest"
+  },
+  "devDependencies": { "electron": "44.7.2" },
+  "dependencies": { "@mediapipe/tasks-vision": "1.2.0" },
+  "license": "MIT"
+}

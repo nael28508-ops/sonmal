@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self'; worker-src 'self' blob:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>손말 첫걸음</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/layout.css" />
+    <link rel="stylesheet" href="styles/components.css" />
+    <link rel="stylesheet" href="styles/screens.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#screen-host">본문으로 건너뛰기</a>
+    <div class="app">
+      <header class="topbar">
+        <a class="brand" href="#/home" aria-label="손말 첫걸음 처음 화면">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 11V6a2 2 0 0 0-4 0v5" />
+              <path d="M14 10V4a2 2 0 0 0-4 0v6" />
+              <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15" />
+            </svg>
+          </span>
+          <span class="brand-text">
+            <span class="brand-name">손말 첫걸음</span>
+            <span class="brand-sub">한국수어 지문자 연습</span>
+          </span>
+        </a>
+        <nav class="nav" id="nav" aria-label="화면 메뉴"></nav>
+        <div class="status" id="status" aria-live="polite"></div>
+      </header>
+      <main class="screen-host" id="screen-host" tabindex="-1"></main>
+    </div>
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+    <div class="sr-only" id="announcer" aria-live="assertive"></div>
+  </body>
+</html>

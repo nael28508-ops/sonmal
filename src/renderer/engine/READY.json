@@ -1,0 +1,17 @@
+{
+  "ready": true,
+  "phase": "content",
+  "date": "2026-11-21",
+  "letters": { "consonant": 14, "double": 5, "vowel": 10, "compound": 11, "number": 11, "total": 51 },
+  "units": ["c1", "c2", "c3", "d1", "v1", "v2", "v3", "v4", "n1", "n2"],
+  "tests": { "command": "node --test \"tests/*.test.mjs\"", "count": 43, "pass": 43 },
+  "visualCheck": "tests/visual/render-letters.cjs (hidden offscreen Electron) -> notes/engine/letters-grid.png, letters-grid-left.png, live-hand.png",
+  "modules": [
+    "engine/geometry.js", "engine/handmodel.js", "engine/features.js", "engine/rules.js", "engine/letters.js",
+    "engine/motion.js", "engine/filters.js", "engine/hangul.js", "engine/knn.js", "engine/progress.js",
+    "ui/hand-render.js", "core/synthetic-tracker.js"
+  ],
+  "sameShapePairs": [["ㅏ", "num-1"], ["ㅑ", "num-2"], ["ㅇ", "num-0"], ["ㄴ", "num-6"]],
+  "motionOnlyPairs": [["ㄱ", "ㄲ"], ["ㄷ", "ㄸ"], ["ㅂ", "ㅃ"], ["ㅅ", "ㅆ"], ["ㅈ", "ㅉ"], ["ㅏ", "ㅘ"], ["ㅐ", "ㅙ"], ["ㅓ", "ㅝ"], ["ㅔ", "ㅞ"], ["ㅓ", "num-10"]],
+  "apiNotes": "See engine/README.md section 'SPEC 과 다른 점'. Letter ids are the jamo itself or 'num-N'; demo letters moved to DEMO_LETTERS; motion type 'sequence' added."
+}
