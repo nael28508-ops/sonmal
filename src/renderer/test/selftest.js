@@ -114,11 +114,16 @@ export async function run(app, { screens }) {
     if (want('practice')) {
       const root = await open('practice', { mode: 'mix' }, 300);
       const scr = app.currentScreen;
+      // 축하 표시는 잠깐만 보이므로 처음부터 지켜봄 (스크린샷 찍는 사이에 지나가도 놓치지 않게)
+      let celebrated = false;
+      const mo = new MutationObserver(() => { if (root.querySelector('.celebrate')) celebrated = true; });
+      mo.observe(root, { childList: true, subtree: true });
       if (scr.letter) vision.playSyntheticLetter(scr.letter);
       await waitFor(() => scr.trainer && scr.trainer.last && scr.trainer.last.features, 4000);
       await sleep(300);
       await shot('05-practice');
-      const ok = await waitFor(() => root.querySelector('.celebrate'), 8000);
+      const ok = await waitFor(() => celebrated || root.querySelector('.celebrate'), 8000);
+      mo.disconnect();
       check('practice drill succeeds with the shown letter', ok);
     }
 
@@ -177,6 +182,83 @@ export async function run(app, { screens }) {
       const done = await waitFor(() => !scr.recording, 5000);
       await sleep(200);
       check('teacher recording stores templates', done && document.querySelector('.teacher-tile.has'));
+    }
+
+    // 번역: 지문자 → 글, 등록 단어 알아보기, 글 → 수어, 단어 등록 녹화
+    if (want('translate')) {
+      await open('translate', {}, 400);
+      const scr = app.currentScreen;
+      await waitFor(() => vision.tracker && vision.state().active, 4000);
+      const tr = vision.tracker;
+      const { createSyntheticTracker } = await import('../core/synthetic-tracker.js');
+      const { frameFeature } = await import('../engine/signwords.js');
+      const byJamo = (j) => allLetters().find((l) => l.jamo === j);
+      // A-1) 지문자 ㄱ → ㅏ = 가
+      tr.setScript([{ pose: byJamo('ㄱ').pose, ms: 1500 }, { pose: byJamo('ㅏ').pose, ms: 1500, blend: 300 }], { loop: false });
+      const spelled = await waitFor(() => scr.text.includes('가'), 8000);
+      check('translate composes fingerspelled jamo into Hangul', spelled, scr.text);
+      // A-2) 가짜 손으로 만든 녹화 3개로 단어 등록 → 같은 동작을 하면 알아봄
+      const flat = PRESETS.flat;
+      const wordScript = (k = 1) => [
+        { pose: flat, ms: 300 },
+        { pose: flat, ms: 0, blend: 500 * k, dx: 1.8 },
+        { pose: flat, ms: 0, blend: 450 * k, dx: 1.8, dy: -1.6 },
+        { pose: flat, ms: 300, dx: 1.8, dy: -1.6 },
+      ];
+      const samplesOf = (seed, center) => {
+        const st = createSyntheticTracker({ script: wordScript(), loop: false, noise: 0.01, seed, center });
+        const out = [];
+        for (let t = 0; t <= st.duration; t += 33) out.push({ t, f: frameFeature(st.frameAt(t).hands, { aspect: 1280 / 720, keepLandmarks: true }) });
+        return out;
+      };
+      const n = scr.registerSamples('감사합니다', [samplesOf(1, [0.5, 0.55]), samplesOf(2, [0.46, 0.5]), samplesOf(3, [0.54, 0.6])], 1280 / 720);
+      check('translate registers a synthetic sign word', n === 3, n);
+      // 숨김 창이 바쁠 때 프레임이 빠질 수 있어 최대 3번까지 다시 보여 줌
+      let got = false;
+      for (let attempt = 0; attempt < 3 && !got; attempt++) {
+        tr.setScript([{ pose: null, ms: 400 }, ...wordScript(1.1), { pose: null, ms: 1500 }], { loop: false });
+        got = await waitFor(() => scr.lastCommitted === '감사합니다', 5000);
+      }
+      check('translate recognizes the registered sign word', got, scr.text);
+      check('sentence has word chip + spelled text', document.querySelector('.tr-chip') && scr.text === '가 감사합니다', scr.text);
+      // 말하기 (목소리는 기록만)
+      document.querySelector('.tr-tiles .tile-btn.primary').click();
+      check('speak button sends the sentence to speech (stub)', app.speech.log.some((x) => x.text === '가 감사합니다'));
+      vision.setSyntheticPose(byJamo('ㅎ').pose);
+      await sleep(450);
+      await shot('19-translate-sign');
+
+      // B) 글 → 수어
+      scr.setTab('text');
+      scr.showText('감사합니다 병원에 가요');
+      await sleep(300);
+      const p = scr.player;
+      check('text→sign plans registered word + fingerspelling', p.steps[0] && p.steps[0].kind === 'word' && p.steps.filter((s) => s.kind === 'letter').length === 12, JSON.stringify(p.steps.map((s) => s.jamo || s.text || s.kind)));
+      const painted = () => {
+        const c = scr.canvas;
+        if (!c || !c.width) return false;
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let k = 0;
+        for (let i = 3; i < d.length; i += 64) if (d[i] > 0) k++;
+        return k > 100;
+      };
+      check('text→sign draws the recorded word', await waitFor(painted, 3000));
+      const li = p.steps.findIndex((s) => s.kind === 'letter');
+      scr.setPlaying(false);
+      scr.seekStep(li + 3);
+      await sleep(400);
+      check('text→sign draws a fingerspelling hand', painted() && document.querySelector('.tr-sylls .now'));
+      await shot('20-translate-text');
+
+      // C) 단어 등록: 진짜 녹화 흐름 (카운트다운 → 녹화 3번)
+      scr.setTab('register');
+      tr.setScript(wordScript(), { loop: true });
+      scr.startRecording('안녕하세요');
+      await sleep(4300);
+      await shot('21-translate-register');
+      const recorded = await waitFor(() => !scr.recording, 20000);
+      const w = scr.words.find((x) => x.text === '안녕하세요');
+      check('register flow records the sign 3 times', recorded && w && w.recordings === 3, JSON.stringify(scr.words));
     }
 
     vision.clearSyntheticPose();

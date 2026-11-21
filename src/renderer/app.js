@@ -21,12 +21,13 @@ import progressScreen from './screens/progress.js';
 import teacher from './screens/teacher.js';
 import settingsScreen from './screens/settings.js';
 import help from './screens/help.js';
+import translate from './screens/translate.js';
 
 const host = window.sonmalHost || null;
 const SELFTEST = !!(host && host.isSelftest) || new URLSearchParams(location.search).has('selftest');
 
 // 메뉴 순서 (null = 구분선)
-const SCREENS = [home, learn, practice, words, write, quiz, null, progressScreen, teacher, settingsScreen, help];
+const SCREENS = [home, learn, practice, words, write, translate, quiz, null, progressScreen, teacher, settingsScreen, help];
 const BY_ID = new Map(SCREENS.filter(Boolean).map((s) => [s.id, s]));
 
 settings.load();

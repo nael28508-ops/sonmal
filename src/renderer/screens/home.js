@@ -117,6 +117,7 @@ export default {
       'div.grid.cols-3.home-quick',
       quickCard(app, 'practice', 'practice', '연습', due.length ? `복습할 글자 ${due.length}개` : '골고루 · 약한 글자 위주로'),
       quickCard(app, 'words', 'words', '낱말 쓰기', '이름 · 인사 · 가족 낱말을 손으로'),
+      quickCard(app, 'translate', 'translate', '번역', '지문자 · 내가 등록한 수어 단어 ↔ 글'),
       quickCard(app, 'quiz', 'quiz', '퀴즈', '그림 보고 맞히기 · 손으로 답하기'),
     );
 

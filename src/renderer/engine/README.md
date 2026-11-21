@@ -28,6 +28,7 @@ node --test "tests/*.test.mjs"      # Node 24 는 node --test tests/ 처럼 폴�
 | `filters.js` | 떨림 줄이기 · 버티기 | `createLandmarkSmoother`, `createOneEuro`, `createHold` |
 | `hangul.js` | 낱말 → 지문자 순서, 모아쓰기 | `decomposeForSpelling`, `KSL_SPELLING`, `compose`, `createComposer`, `jamoName` |
 | `knn.js` | 선생님 손 본뜨기 | `vectorize`, `createTemplateStore`, 기본 저장소 `addTemplate` / `match` / `exportTemplates` / `importTemplates` |
+| `signwords.js` | 등록한 수어 단어 알아보기 (DTW) · 글 → 수어 순서 | `frameFeature`, `buildRecording`, `createSignLexicon`, `createSignSpotter`, `planTranslation`, `dtw` |
 | `progress.js` | 배운 기록 · 복습 일정 | `createProgress({ storage, now })` |
 
 함께 쓰는 화면 쪽 모듈 (엔진 담당이 만듦):
