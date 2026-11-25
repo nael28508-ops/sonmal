@@ -118,7 +118,7 @@ const exts = (...fs) => fs.map(ext);
 
 // 움직임
 const SHIFT_RIGHT = Object.freeze({
-  type: 'move', dir: 'right', minDist: 0.8, within: 1500, desc: '손 모양 그대로 오른쪽으로 한 번 옮겨 주세요',
+  type: 'move', dir: 'right', minDist: 0.5, within: 1500, desc: '손 모양 그대로 오른쪽으로 한 번 옮겨 주세요',
 });
 const SHAKE_SIDE = Object.freeze({
   type: 'shake', dir: 'left', minDist: 0.2, count: 3, within: 2000, desc: '손을 좌우로 작게 흔들어 주세요',

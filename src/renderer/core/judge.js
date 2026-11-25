@@ -18,8 +18,14 @@ export function createJudge({ getSettings, holdMs = 600 } = {}) {
   let letterId = null;
   let succeeded = false;
   let last = null;
+  // 움직임 글자: 손을 옮기는 동안 손목이 살짝 돌아가 모양이 잠깐 흐트러져도 되도록
+  // "최근에 모양을 제대로 만들어 버텼는지"를 시간과 함께 기억함
+  let shapeOkAt = -Infinity; // 마지막으로 모양이 맞았던 때
+  let heldAt = -Infinity; // 마지막으로 모양을 충분히 버텼던 때 (hold 30% 이상)
 
   function reset() {
+    shapeOkAt = -Infinity;
+    heldAt = -Infinity;
     smoother.reset();
     hold.reset();
     motion.reset();
@@ -62,7 +68,14 @@ export function createJudge({ getSettings, holdMs = 600 } = {}) {
     const h = hold.push(!!shapeOk, frame.t);
     let justSucceeded = false;
     const motionDone = !letter.motion || (motionState && motionState.done);
-    const ok = letter.motion ? h.progress >= 0.3 && motionDone && evaluation.shapePass : h.held;
+    if (shapeOk) shapeOkAt = frame.t;
+    if (shapeOk && h.progress >= 0.3) heldAt = frame.t;
+    const within = (letter.motion && letter.motion.within) || 1500;
+    // 실제 손 실험(2026-11-25): 옮기는 끝에서 손목이 돌아가 모양이 깨져서 ㄲ 이 안 됐음
+    // → 움직임을 마쳤을 때 모양이 0.5초 안에 맞았고, 움직임 시작 무렵에 모양을 버텼으면 성공
+    const ok = letter.motion
+      ? motionDone && frame.t - shapeOkAt <= 500 && frame.t - heldAt <= within + 500
+      : h.held;
     if (ok && !succeeded) {
       succeeded = true;
       justSucceeded = true;
