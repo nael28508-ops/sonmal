@@ -1,4 +1,4 @@
-/* 손말 첫걸음 — 화면별 배치 */
+/* Learn 수어 — 화면별 배치 */
 
 /* ───────── 공통: 손 연습 판 (카메라 + 고칠 점 + 체크리스트) ───────── */
 .trainer {
@@ -1420,4 +1420,142 @@
 
 .practice-ref.veiled .ref-hand-tag {
   visibility: hidden;
+}
+
+/* ───────── 설정: 카메라 배경 ───────── */
+.bg-group .callout {
+  margin-bottom: var(--sp-2);
+}
+
+.bg-options:empty {
+  display: none;
+}
+
+.bg-options {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: var(--border-w) solid var(--line);
+}
+
+.bg-options > .setting-row {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.bg-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: var(--sp-2);
+}
+
+.bg-swatches.scenes {
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+}
+
+.bg-swatch {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 2px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+
+.bg-swatch:hover {
+  border-color: var(--line-strong);
+}
+
+.bg-swatch[aria-pressed='true'] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft-2);
+}
+
+.bg-swatch:focus-visible,
+.bg-swatch:focus-within {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.bg-swatch-fill,
+.bg-scene-thumb,
+.bg-color-input {
+  display: block;
+  width: 100%;
+  height: 48px;
+  border-radius: calc(var(--r-md) - 6px);
+}
+
+.bg-scene-thumb {
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.bg-color-input {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.bg-swatch-name {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.bg-swatch-check {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.bg-swatch-check:empty {
+  display: none;
+}
+
+.bg-photo-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.bg-photo-thumb {
+  flex: none;
+  width: 160px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  border: var(--border-w) solid var(--line);
+}
+
+.bg-photo-thumb.empty {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  background: var(--surface-3);
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+
+.bg-group .setting-row:has(.segmented) {
+  grid-template-columns: 1fr;
+}
+
+.bg-group .setting-row:has(.segmented) .setting-control {
+  justify-content: flex-start;
 }

@@ -119,7 +119,7 @@ export function createTemplateStore() {
      */
     fromJSON(json, { merge = true } = {}) {
       const data = typeof json === 'string' ? JSON.parse(json) : json;
-      if (!data || data.kind !== 'sonmal-templates' || !Array.isArray(data.templates)) throw new Error('손말 첫걸음 선생님 손 파일이 아니에요');
+      if (!data || data.kind !== 'sonmal-templates' || !Array.isArray(data.templates)) throw new Error('Learn 수어 선생님 손 파일이 아니에요');
       if (data.version !== VECTOR_VERSION || data.length !== VECTOR_LENGTH) throw new Error('다른 판의 선생님 손 파일이라 읽을 수 없어요');
       const ok = data.templates.filter((x) => x && x.letterId && Array.isArray(x.v) && x.v.length === VECTOR_LENGTH && x.v.every(Number.isFinite));
       if (!merge) items = [];

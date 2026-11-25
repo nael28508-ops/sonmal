@@ -62,7 +62,7 @@ export default {
       h(
         'div.home-hero-text',
         h('div.home-hello', greeting()),
-        h('h1', last ? '지난번에 하던 곳부터 이어서 해요' : '손말 첫걸음에 오신 것을 환영해요'),
+        h('h1', last ? '지난번에 하던 곳부터 이어서 해요' : 'Learn 수어에 오신 것을 환영해요'),
         h(
           'p.lead',
           last

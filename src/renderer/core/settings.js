@@ -19,6 +19,10 @@ export const DEFAULTS = Object.freeze({
   theme: 'system', // 'system' | 'light' | 'dark'
   autoAdvance: true, // 맞히면 다음 글자로 저절로
   showFps: true,
+  bg: 'none', // 카메라 배경: 'none' | 'blur' | 'color' | 'scene' | 'photo' (보이는 화면만 바뀜)
+  bgBlur: 12, // 흐림 세기 4 ~ 24
+  bgColor: '#24483f', // 단색 배경
+  bgScene: 'sky', // 그림 배경
 });
 
 const ALLOWED = {
@@ -27,6 +31,8 @@ const ALLOWED = {
   textSize: ['normal', 'large', 'xlarge'],
   contrast: ['normal', 'high'],
   theme: ['system', 'light', 'dark'],
+  bg: ['none', 'blur', 'color', 'scene', 'photo'],
+  bgScene: ['sky', 'mint', 'board', 'forest', 'dusk', 'night'],
 };
 
 let current = { ...DEFAULTS };
@@ -47,6 +53,8 @@ function sanitize(obj) {
     }
   }
   out.voiceRate = Math.min(1.4, Math.max(0.6, Number(out.voiceRate) || 1));
+  out.bgBlur = Math.min(24, Math.max(4, Math.round(Number(out.bgBlur) || 12)));
+  if (!/^#[0-9a-f]{6}$/i.test(out.bgColor)) out.bgColor = DEFAULTS.bgColor;
   return out;
 }
 

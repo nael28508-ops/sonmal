@@ -57,7 +57,7 @@ export const templates = {
   },
   /** 파일로 내보낼 JSON */
   exportJSON() {
-    return { ...store.toJSON(), teacher: teacherName, exportedAt: new Date().toISOString(), app: '손말 첫걸음' };
+    return { ...store.toJSON(), teacher: teacherName, exportedAt: new Date().toISOString(), app: 'Learn 수어' };
   },
   /** 파일에서 가져오기 → 가져온 본 개수 (모양이 틀리면 Error) */
   importJSON(json, { merge = true } = {}) {

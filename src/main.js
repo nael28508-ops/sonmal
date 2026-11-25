@@ -1,4 +1,4 @@
-// 손말 첫걸음 — Electron 메인 프로세스
+// Learn 수어 — Electron 메인 프로세스
 // - 프로젝트 폴더를 app://local/ 주소로 보여 줌 (MediaPipe 가 WASM · 모델을 fetch 로 읽어야 해서 file:// 대신)
 // - 카메라 권한은 이 앱 화면(app://local)에만, 다른 권한은 모두 거절
 // - --selftest: 보이지 않는 창(offscreen)에서 자동 점검을 돌리고 결과를 SELFTEST_RESULT 한 줄로 출력
@@ -13,7 +13,7 @@ const { pathToFileURL } = require('url');
 const ROOT = path.resolve(__dirname, '..'); // 프로젝트 폴더 (node_modules · models 까지)
 const ORIGIN = 'app://local';
 const START_PAGE = `${ORIGIN}/src/renderer/index.html`;
-const APP_TITLE = '손말 첫걸음';
+const APP_TITLE = 'Learn 수어';
 const SELFTEST_TIMEOUT_MS = 180000;
 const SELFTEST_PARTITION = 'sonmal-selftest'; // 'persist:' 가 없으면 메모리에만 저장 → 점검이 진짜 기록을 건드리지 않음
 

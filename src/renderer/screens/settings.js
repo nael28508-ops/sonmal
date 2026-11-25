@@ -2,6 +2,7 @@
 import { h, icon, btn, clear, setText } from '../ui/dom.js';
 import { segmented, toggle, confirmDialog, callout } from '../ui/components.js';
 import { STRICTNESS_KO } from '../engine/rules.js';
+import { BG_MODES, BG_COLORS, BG_SCENES, paintScene } from '../core/background.js';
 
 let offs = [];
 
@@ -18,7 +19,7 @@ export default {
   title: '설정',
   nav: '설정',
   icon: 'settings',
-  mount(root, app) {
+  mount(root, app, params = {}) {
     const s = app.settings;
     const set = (k) => (v) => s.set(k, v);
 
@@ -66,6 +67,8 @@ export default {
       },
     });
 
+    const bgGroup = backgroundGroup(app);
+
     root.append(
       h(
         'div.page.settings',
@@ -75,6 +78,7 @@ export default {
           h(
             'div.stack',
             group('camera', '카메라', row('쓸 카메라', null, h('div.stack', camSelect, camInfo))),
+            bgGroup,
             group(
               'hand',
               '손과 판정',
@@ -89,7 +93,7 @@ export default {
               row('글자 이름 읽어 주기', '맞히면 글자 이름을 소리로 읽어 줘요. M 키로 끄고 켤 수 있어요.', toggle({ label: '글자 이름 읽어 주기', checked: s.get('voice'), onchange: set('voice') })),
               row('고칠 점도 읽어 주기', '같은 고칠 점이 오래 이어지면 소리로도 알려 드려요.', toggle({ label: '고칠 점도 읽어 주기', checked: s.get('speakHints'), onchange: set('speakHints') })),
               row('효과음', '맞힘 · 틀림을 짧은 소리로 알려 드려요.', toggle({ label: '효과음', checked: s.get('sound'), onchange: set('sound') })),
-              row('목소리', null, h('div.row.setting-voice', voiceSelect, btn('들어 보기', { icon: 'play', kind: 'soft', size: 'sm', onclick: () => { if (!app.speech.speak('안녕하세요. 손말 첫걸음이에요.')) app.toast('목소리가 꺼져 있거나 소리 없이 모드예요', { tone: 'hint' }); } }))),
+              row('목소리', null, h('div.row.setting-voice', voiceSelect, btn('들어 보기', { icon: 'play', kind: 'soft', size: 'sm', onclick: () => { if (!app.speech.speak('안녕하세요. Learn 수어예요.')) app.toast('목소리가 꺼져 있거나 소리 없이 모드예요', { tone: 'hint' }); } }))),
               row('말하는 빠르기', null, h('div.row.setting-rate', rate, rateOut)),
             ),
           ),
@@ -143,9 +147,97 @@ export default {
         ),
       ),
     );
+    if (params.focus === 'background') requestAnimationFrame(() => bgGroup.scrollIntoView({ block: 'start' }));
   },
   unmount() {
     for (const off of offs) off();
     offs = [];
   },
 };
+
+// ───────── 카메라 배경 ─────────
+function backgroundGroup(app) {
+  const s = app.settings;
+  const bg = app.background;
+  const body = h('div.bg-options');
+  const fileInput = h('input', { type: 'file', accept: 'image/*', hidden: true, tabindex: '-1', 'aria-hidden': 'true' });
+
+  const swatchBtn = (on, label, onclick, ...kids) =>
+    h('button.bg-swatch', { type: 'button', 'aria-pressed': String(on), title: label, 'aria-label': label, onclick }, ...kids, h('span.bg-swatch-check', { 'aria-hidden': 'true' }, on ? '✓' : ''));
+
+  function render() {
+    const cur = s.get('bg');
+    clear(body);
+    if (cur === 'blur') {
+      const out = h('output.num.setting-rate-out', String(s.get('bgBlur')));
+      body.append(
+        row('흐림 세기', '세게 할수록 뒤쪽이 더 뿌옇게 보여요.', h('div.row.setting-rate', h('input.slider', {
+          type: 'range', min: '4', max: '24', step: '1', value: String(s.get('bgBlur')), 'aria-label': '흐림 세기',
+          oninput: (e) => { s.set('bgBlur', Number(e.target.value)); setText(out, e.target.value); },
+        }), out)),
+      );
+    } else if (cur === 'color') {
+      const custom = h('input.bg-color-input', { type: 'color', value: s.get('bgColor'), 'aria-label': '색 직접 고르기', oninput: (e) => s.set('bgColor', e.target.value) });
+      body.append(
+        h('div.field-label', '색 고르기'),
+        h('div.bg-swatches',
+          BG_COLORS.map(([c, name]) => swatchBtn(s.get('bgColor').toLowerCase() === c, name, () => { s.set('bgColor', c); render(); }, h('span.bg-swatch-fill', { style: { background: c } }), h('span.bg-swatch-name', name))),
+          h('label.bg-swatch.custom', { title: '직접 고르기' }, custom, h('span.bg-swatch-name', '직접 고르기')),
+        ),
+      );
+    } else if (cur === 'scene') {
+      body.append(
+        h('div.field-label', '그림 고르기'),
+        h('div.bg-swatches.scenes', BG_SCENES.map(([id, name]) => {
+          const c = h('canvas.bg-scene-thumb', { width: 160, height: 90 });
+          paintScene(c.getContext('2d'), id, 160, 90);
+          return swatchBtn(s.get('bgScene') === id, name, () => { s.set('bgScene', id); render(); }, c, h('span.bg-swatch-name', name));
+        })),
+      );
+    } else if (cur === 'photo' || cur === 'none') {
+      const has = bg.hasPhoto();
+      if (cur === 'photo' || has) {
+        body.append(
+          h('div.bg-photo-row',
+            has ? h('img.bg-photo-thumb', { src: bg.photoUrl(), alt: '배경으로 고른 사진' }) : h('div.bg-photo-thumb.empty', icon('image'), h('span', '사진 없음')),
+            h('div.stack',
+              h('div.row', btn(has ? '다른 사진 고르기' : '사진 고르기', { icon: 'upload', kind: 'soft', size: 'sm', onclick: () => fileInput.click() }),
+                has ? btn('사진 지우기', { icon: 'trash', kind: 'ghost', size: 'sm', onclick: () => { bg.clearPhoto(); app.toast('사진을 지웠어요'); render(); } }) : null),
+              h('div.field-help', '사진은 이 컴퓨터에만 저장돼요. 크면 1280×720 크기로 줄여서 저장해요.'),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
+    if (!f) return;
+    try {
+      await bg.savePhoto(f);
+      s.set('bg', 'photo');
+      app.toast('내 사진을 배경으로 했어요');
+    } catch (err) {
+      app.toast(`사진을 쓰지 못했어요: ${err.message}`, { tone: 'bad' });
+    }
+    render();
+  });
+
+  const seg = segmented({ label: '카메라 배경', options: BG_MODES, value: s.get('bg'), onchange: (v) => s.set('bg', v) });
+  const off = s.subscribe((_st, changed) => {
+    if (changed.includes('bg')) render();
+  });
+  offs.push(off);
+  render();
+  return h(
+    'section.card.setting-group.bg-group',
+    { id: 'setting-background' },
+    h('h2.section-title', icon('image'), '카메라 배경'),
+    callout('화상 통화처럼 내 뒤쪽만 흐리게 하거나 다른 배경으로 바꿔 보여 드려요. 화면에 보이는 모습만 바뀌고, 손 인식은 원래 영상으로 해요. 실제로 뒤쪽 벽이 단순하고 밝으면 손을 더 잘 알아봐요.', { tone: 'plain' }),
+    row('배경', '카메라 화면 오른쪽 아래 “배경” 단추로도 바꿀 수 있어요.', seg),
+    body,
+    fileInput,
+  );
+}

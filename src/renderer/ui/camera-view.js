@@ -4,6 +4,7 @@
 import { h, icon, setText, clear } from './dom.js';
 import { ring } from './components.js';
 import { drawLive, fitCanvas } from './hand-draw.js';
+import { BG_MODES } from '../core/background.js';
 
 /**
  * @param {object} app 앱 공용 도구 (vision, settings ...)
@@ -22,7 +23,12 @@ export function createCameraView(app, { showRing = true, tag = '' } = {}) {
   const hintEl = h('div.camera-hint', { role: 'status' });
   hintEl.hidden = true;
   const celebrateHost = h('div.celebrate-host');
-  const stage = h('div.camera-stage', vision.synthetic ? null : vision.video, canvas, tagEl, ringEl, hintEl, celebrateHost);
+  // 가상 배경: 합성한 그림을 영상 위에 덮음 (손 인식은 원래 영상 그대로)
+  const bg = app.background || null;
+  const bgCanvas = h('canvas.camera-bg', { 'aria-hidden': 'true' });
+  const offBg = bg ? bg.mount(bgCanvas) : () => {};
+  const picker = bg ? createBgPicker(app) : null;
+  const stage = h('div.camera-stage', vision.synthetic ? null : vision.video, bgCanvas, canvas, tagEl, ringEl, hintEl, picker ? picker.el : null, celebrateHost);
   if (vision.synthetic) stage.classList.add('synthetic');
   const el = h('div.camera-panel', { role: 'img', 'aria-label': '카메라 화면 (거울처럼 보여요)' }, stage, notice);
 
@@ -187,8 +193,100 @@ export function createCameraView(app, { showRing = true, tag = '' } = {}) {
     destroy() {
       clearTimeout(celebrateTimer);
       ro.disconnect();
+      offBg();
+      if (picker) picker.destroy();
       offState();
       if (vision.video.parentNode === stage) stage.removeChild(vision.video);
+    },
+  };
+}
+
+// 카메라 판 오른쪽 아래의 작은 "배경" 버튼 + 고르기 메뉴
+function createBgPicker(app) {
+  const { settings, background } = app;
+  const fileInput = h('input', { type: 'file', accept: 'image/*', hidden: true, tabindex: '-1', 'aria-hidden': 'true' });
+  const label = h('span');
+  const button = h('button.camera-bg-btn', { type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: '카메라 배경 바꾸기' }, icon('image'), label);
+  const menu = h('div.camera-bg-menu', { role: 'menu', 'aria-label': '카메라 배경' });
+  menu.hidden = true;
+  const el = h('div.camera-bg-pick', button, menu, fileInput);
+
+  const choose = (v) => {
+    if (v === 'photo' && !background.hasPhoto()) {
+      fileInput.click();
+      return;
+    }
+    settings.set('bg', v);
+    close();
+  };
+  function render() {
+    const cur = background.mode();
+    setText(label, `배경: ${(BG_MODES.find(([v]) => v === cur) || BG_MODES[0])[1]}`);
+    clear(menu).append(
+      ...BG_MODES.map(([v, text]) =>
+        h(
+          'button.camera-bg-item',
+          { type: 'button', role: 'menuitemradio', 'aria-checked': String(v === cur), onclick: () => choose(v) },
+          h('span.camera-bg-check', v === cur ? '✓' : ''),
+          h('span', v === 'photo' && !background.hasPhoto() ? '내 사진 고르기…' : text),
+        ),
+      ),
+      h('button.camera-bg-item.more', { type: 'button', role: 'menuitem', onclick: () => { close(); app.navigate('settings', { focus: 'background' }); } }, h('span.camera-bg-check'), h('span', '자세히 설정…')),
+    );
+  }
+  function open() {
+    render();
+    menu.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    const first = menu.querySelector('[aria-checked="true"]') || menu.querySelector('button');
+    if (first) first.focus();
+    setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
+  }
+  function close() {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', outside, true);
+  }
+  const outside = (e) => {
+    if (!el.contains(e.target)) close();
+  };
+  button.addEventListener('click', () => (menu.hidden ? open() : close()));
+  menu.addEventListener('keydown', (e) => {
+    const items = [...menu.querySelectorAll('button')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'Escape') {
+      close();
+      button.focus();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus();
+    } else return;
+    e.preventDefault();
+    e.stopPropagation(); // 화살표가 글자 넘기기로 가지 않게
+  });
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
+    if (!f) return;
+    try {
+      await background.savePhoto(f);
+      settings.set('bg', 'photo');
+      app.toast('내 사진을 배경으로 했어요');
+    } catch (err) {
+      app.toast(`사진을 쓰지 못했어요: ${err.message}`, { tone: 'bad' });
+    }
+    close();
+    render();
+  });
+  const off = settings.subscribe((_s, changed) => {
+    if (changed.some((k) => k.startsWith('bg'))) render();
+  });
+  render();
+  return {
+    el,
+    destroy() {
+      close();
+      off();
     },
   };
 }

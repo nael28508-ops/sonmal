@@ -271,6 +271,88 @@ export async function run(app, { screens }) {
       await open('settings', {}, 300);
       await shot('13-settings');
     }
+
+    // 카메라 배경 (가상 배경): 설정 화면 + 카메라 판에서 모든 배경을 합성해 봄
+    if (want('settings') && app.background) {
+      const bg = app.background;
+      await open('settings', { focus: 'background' }, 400);
+      const group = document.querySelector('#setting-background');
+      check('background settings group is shown', group && group.querySelectorAll('.segmented [role="radio"]').length === 5);
+      const pickMode = (text) => [...group.querySelectorAll('.segmented [role="radio"]')].find((b) => b.textContent === text);
+      pickMode('단색').click();
+      await sleep(100);
+      check('color mode shows swatches + custom picker', app.settings.get('bg') === 'color' && group.querySelectorAll('.bg-swatch').length === 6 && group.querySelector('input[type="color"]'));
+      group.querySelectorAll('.bg-swatch')[1].click();
+      check('choosing a swatch saves the color', app.settings.get('bgColor') === '#1f3354', app.settings.get('bgColor'));
+      // 내 사진: 코드로 만든 그림을 파일로 넘겨 저장해 봄 (2000×1500 → 1280×720 안으로)
+      const pc = document.createElement('canvas');
+      pc.width = 2000;
+      pc.height = 1500;
+      const g = pc.getContext('2d');
+      const grd = g.createLinearGradient(0, 0, 2000, 1500);
+      grd.addColorStop(0, '#20476b');
+      grd.addColorStop(1, '#6b8fb0');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 2000, 1500);
+      g.fillStyle = 'rgba(255,255,255,0.5)';
+      g.font = '700 220px sans-serif';
+      g.fillText('내 사진 →', 200, 800); // 글자가 거꾸로 나오지 않는지 눈으로 확인
+      const blob = await new Promise((r) => pc.toBlob(r, 'image/png'));
+      const size = await bg.savePhoto(new File([blob], 'test.png', { type: 'image/png' }));
+      const img = new Image();
+      img.src = bg.photoUrl();
+      await img.decode();
+      check('photo is resized to fit 1280x720 and stored', bg.hasPhoto() && img.naturalWidth <= 1280 && img.naturalHeight <= 720 && size <= 1800000, `${img.naturalWidth}x${img.naturalHeight}, ${size} chars`);
+      pickMode('그림').click();
+      await sleep(150);
+      check('scene mode shows generated scene tiles', group.querySelectorAll('canvas.bg-scene-thumb').length === 6);
+      group.querySelectorAll('.bg-swatch')[2].click();
+      await sleep(150);
+      group.scrollIntoView({ block: 'start' });
+      await shot('22-background-settings');
+
+      // 카메라 판: 가짜 사람 영상으로 배경마다 합성
+      await open('learn', { letter: first.id }, 300);
+      vision.setSyntheticPose(first.pose);
+      const t0 = performance.now();
+      const ready = await waitFor(() => bg.status === 'error' || bg.stats().frameCount > 3, 60000);
+      const st0 = bg.stats();
+      check('background segmenter loads and composites', ready && st0.status === 'ready', `${JSON.stringify(st0)} in ${Math.round(performance.now() - t0)} ms`);
+      const cv = document.querySelector('.camera-stage canvas.camera-bg');
+      check('composite canvas is visible over the video', cv && !cv.hidden && cv.width > 0);
+      check('segmenter finds the test person', st0.personShare > 0.03, st0.personShare);
+      check('segmentation is throttled when slow (not every frame)', st0.segEvery >= 33, `every ${st0.segEvery} ms, ${st0.segCost} ms each`);
+      // 거울 확인: 원본 x≈0.6 에 있는 얼굴이 화면 x≈0.4 에 피부색으로 보여야 함
+      app.settings.set({ bg: 'color', bgColor: '#1f3354' });
+      await sleep(400);
+      const px = (fx, fy) => Array.from(cv.getContext('2d').getImageData(Math.round(cv.width * fx), Math.round(cv.height * fy), 1, 1).data);
+      const L = px(0.4, 0.42);
+      const R = px(0.6, 0.42);
+      const skinish = (c) => c[0] > 150 && c[0] > c[2] + 30;
+      check('person is mirrored like the video (face on the left)', skinish(L) && !skinish(R), `left=${L} right=${R}`);
+      for (const m of ['blur', 'color', 'scene', 'photo']) {
+        app.settings.set('bg', m);
+        const f0 = bg.stats().frameCount;
+        const ok = await waitFor(() => bg.stats().frameCount > f0 + 3, 4000);
+        check(`background mode ${m} renders`, ok && !cv.hidden, JSON.stringify(bg.stats()));
+      }
+      // 빠른 고르기 메뉴
+      const pickBtn = document.querySelector('.camera-bg-btn');
+      pickBtn.click();
+      await sleep(100);
+      const items = [...document.querySelectorAll('.camera-bg-menu [role="menuitemradio"]')];
+      items.find((b) => b.textContent.includes('그림')).click();
+      await sleep(200);
+      check('camera quick picker switches the background', app.settings.get('bg') === 'scene' && document.querySelector('.camera-bg-menu').hidden);
+      app.settings.set('bgScene', 'mint');
+      await sleep(600);
+      await shot('23-background-camera');
+      app.settings.set('bg', 'none');
+      await sleep(200);
+      check('original mode hides the composite', cv.hidden);
+      bg.clearPhoto();
+      vision.clearSyntheticPose();
+    }
     if (want('help')) {
       await open('help', {}, 300);
       await shot('14-help');

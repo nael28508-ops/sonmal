@@ -1,4 +1,4 @@
-// 손말 첫걸음 — 화면 쪽 시작점
+// Learn 수어 — 화면 쪽 시작점
 // - 공용 도구(설정 · 저장 · 목소리 · 효과음 · 카메라와 손 인식 · 기록)를 만들고
 // - 위쪽 메뉴 · 상태 표시(카메라 / 손 / 속도) · 화면 바꾸기(#/화면) · 키보드 단축키를 맡음
 // - 자동 점검(?selftest=1)이면 가짜 손을 쓰고 test/selftest.js 를 돌림
@@ -7,6 +7,7 @@ import * as storage from './core/storage.js';
 import { createSpeech } from './core/speech.js';
 import { createSound } from './core/sound.js';
 import { createVision } from './core/vision.js';
+import { createBackground } from './core/background.js';
 import { createProgressStore } from './core/progress-store.js';
 import { h, icon, setText, clear } from './ui/dom.js';
 import { toast } from './ui/components.js';
@@ -37,6 +38,7 @@ if (SELFTEST) document.documentElement.setAttribute('data-motion', 'reduce');
 const speech = createSpeech({ getSettings: () => settings.get(), stub: SELFTEST });
 const sound = createSound({ getSettings: () => settings.get(), disabled: SELFTEST });
 const vision = createVision({ synthetic: SELFTEST, settings });
+const background = createBackground({ video: vision.video, settings, synthetic: SELFTEST, toast }); // 카메라 배경 (보이는 화면만 바꿈)
 const progress = createProgressStore(storage.adapter);
 
 const screenHost = document.getElementById('screen-host');
@@ -56,6 +58,7 @@ const app = {
   speech,
   sound,
   vision,
+  background,
   progress,
   toast,
   navigate,
@@ -197,7 +200,7 @@ async function show(id, params) {
     if (sid === screen.id) item.a.setAttribute('aria-current', 'page');
     else item.a.removeAttribute('aria-current');
   }
-  document.title = screen.id === 'home' ? '손말 첫걸음' : `${screen.title} · 손말 첫걸음`;
+  document.title = screen.id === 'home' ? 'Learn 수어' : `${screen.title} · Learn 수어`;
   try {
     await screen.mount(root, app, params || {});
   } catch (err) {

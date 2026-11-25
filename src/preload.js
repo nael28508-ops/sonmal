@@ -1,4 +1,4 @@
-// 손말 첫걸음 — preload
+// Learn 수어 — preload
 // 화면(렌더러)에는 Node 기능을 주지 않고, 꼭 필요한 몇 가지만 window.sonmalHost 로 열어 줌
 'use strict';
 

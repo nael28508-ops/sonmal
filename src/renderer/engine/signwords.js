@@ -369,7 +369,7 @@ export function createSignLexicon() {
     },
     toJSON() {
       return {
-        app: '손말 첫걸음',
+        app: 'Learn 수어',
         kind: 'sonmal-signs',
         version: SIGN_VERSION,
         words: api.list().map((w) => ({ id: w.id, text: w.text, createdAt: w.createdAt, recordings: w.recordings, demo: w.demo })),

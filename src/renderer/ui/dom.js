@@ -120,6 +120,7 @@ const P = {
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   space: '<path d="M3 10v4a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-4"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
 };
 
 /** 아이콘 SVG 요소 (aria-hidden) */

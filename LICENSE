@@ -21,5 +21,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ---
-models/hand_landmarker.task is from Google MediaPipe and is licensed under the
-Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+models/hand_landmarker.task and models/selfie_segmenter.tflite are from Google
+MediaPipe and are licensed under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0).

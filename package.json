@@ -1,6 +1,6 @@
 {
   "name": "sonmal",
-  "productName": "손말 첫걸음",
+  "productName": "Learn 수어",
   "version": "1.0.0",
   "description": "웹캠 손 인식으로 배우는 한국수어 지문자 연습 프로그램",
   "private": true,
