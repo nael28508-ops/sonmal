@@ -2,3 +2,4 @@ node_modules/
 selftest-out/
 selftest-out-*/
 *.log
+logs/

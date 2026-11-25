@@ -4,6 +4,7 @@ import { extractFeatures, pickHand, qualityMessage } from '../engine/features.js
 import { evaluate } from '../engine/rules.js';
 import { createHold, createLandmarkSmoother } from '../engine/filters.js';
 import { createMotionTracker } from '../engine/motion.js';
+import { diag } from './diag.js';
 import { templates } from './templates.js';
 
 /**
@@ -67,6 +68,7 @@ export function createJudge({ getSettings, holdMs = 600 } = {}) {
       justSucceeded = true;
     }
     last = { hand, features, evaluation, quality, hold: h, motion: motionState, success: succeeded, justSucceeded, aspect };
+    if (diag.on) diag.push(letter, frame, last);
     return last;
   }
 

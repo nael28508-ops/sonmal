@@ -203,6 +203,16 @@ ipcMain.on('sonmal:log', (event, msg) => {
   if (SELFTEST) process.stdout.write(`[selftest] ${String(msg).slice(0, 2000)}\n`);
 });
 
+ipcMain.handle('sonmal:diag', async (event, json) => {
+  if (!fromAppSender(event)) return null;
+  const dir = path.join(ROOT, 'logs');
+  fs.mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const file = path.join(dir, `diag-${stamp}.json`);
+  fs.writeFileSync(file, String(json).slice(0, 50 * 1024 * 1024), 'utf8');
+  return file;
+});
+
 ipcMain.on('sonmal:fullscreen', (event) => {
   if (!fromAppSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender);

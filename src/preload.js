@@ -31,4 +31,6 @@ contextBridge.exposeInMainWorld('sonmalHost', {
   done: (result) => ipcRenderer.send('sonmal:done', plain(result)),
   log: (msg) => ipcRenderer.send('sonmal:log', String(msg)),
   toggleFullscreen: () => ipcRenderer.send('sonmal:fullscreen'),
+  /** 진단 기록 JSON 을 프로젝트의 logs 폴더에 저장하고 경로를 돌려줌 */
+  saveDiag: (json) => ipcRenderer.invoke('sonmal:diag', String(json)),
 });

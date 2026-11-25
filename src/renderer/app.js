@@ -10,6 +10,7 @@ import { createVision } from './core/vision.js';
 import { createProgressStore } from './core/progress-store.js';
 import { h, icon, setText, clear } from './ui/dom.js';
 import { toast } from './ui/components.js';
+import { diag } from './core/diag.js';
 
 import home from './screens/home.js';
 import learn from './screens/learn.js';
@@ -247,6 +248,17 @@ window.addEventListener('keydown', (e) => {
     if (vision.synthetic) toast('점검 중에는 카메라를 바꾸지 않아요', { tone: 'hint' });
     else if (vision.state().cameras.length < 2) toast('바꿀 수 있는 다른 카메라가 없어요', { tone: 'hint' });
     else vision.nextCamera().then(() => toast(`카메라: ${vision.state().cameraLabel}`));
+    e.preventDefault();
+  } else if (e.code === 'KeyD' && !inField) {
+    // 진단 기록 켜기/끄기
+    if (!diag.on) {
+      diag.start();
+      document.body.classList.add('diag-on');
+      toast('진단 기록을 시작했어요. 다 하면 D 를 다시 눌러 주세요', { tone: 'hint' });
+    } else {
+      document.body.classList.remove('diag-on');
+      diag.stop({ route: location.hash }).then((p) => toast(p ? `진단 기록을 저장했어요: ${p.split(/[\/]/).slice(-2).join('/')}` : '저장하지 못했어요', { tone: p ? 'ok' : 'error' }));
+    }
     e.preventDefault();
   } else if (e.code === 'KeyM') {
     const on = !settings.get('voice');
