@@ -344,9 +344,18 @@ export async function run(app, { screens }) {
       items.find((b) => b.textContent.includes('그림')).click();
       await sleep(200);
       check('camera quick picker switches the background', app.settings.get('bg') === 'scene' && document.querySelector('.camera-bg-menu').hidden);
-      app.settings.set('bgScene', 'mint');
-      await sleep(600);
+      // 진짜 사람 사진으로 (손가락 · 머리카락 가장자리, 속도)
+      const { runPhotoTest, loadPhoto, findHands } = await import('./bg-photo-test.js');
+      await runPhotoTest({ app, check, shot, sleep, waitFor, log });
+      // 23: 카메라 판에 그림 배경 (손 흔드는 사람)
+      vision.clearSyntheticPose();
+      const wave = await loadPhoto('waving');
+      const [wh] = await findHands([wave]);
+      bg.setTestSource(wave, { hands: wh, motion: true });
+      app.settings.set({ bg: 'scene', bgScene: 'mint' });
+      await sleep(1200);
       await shot('23-background-camera');
+      bg.setTestSource(null);
       app.settings.set('bg', 'none');
       await sleep(200);
       check('original mode hides the composite', cv.hidden);

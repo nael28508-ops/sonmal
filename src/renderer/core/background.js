@@ -1,13 +1,20 @@
-// 카메라 배경(가상 배경): 화상 통화처럼 내 뒤쪽만 흐리게 · 단색 · 그림 · 내 사진으로 바꿔 보여 줌
+// 카메라 배경(가상 배경): 화상 통화(줌)처럼 내 뒤쪽만 흐리게 · 단색 · 그림 · 내 사진으로 자연스럽게 바꿔 보여 줌
 // - 보이는 화면만 바꿈. 손 인식(tracker.js)은 언제나 원래 영상(<video>)을 그대로 씀
-// - MediaPipe ImageSegmenter(selfie segmenter)로 사람 영역을 찾음. "원래대로"가 아닐 때만 처음 불러옴
-// - 작은 크기(256×144)로 사람을 찾고, 느리면 덜 자주 찾음. 실패하면 원래 영상 + 알림
+// - 사람 찾기: MediaPipe ImageSegmenter + 가로 화면용 selfie segmenter(256×144, 16:9 그대로, 빠름). "원래대로"가 아닐 때만 처음 불러옴
+// - 가면 다듬기 · 합성은 그래픽 카드(WebGL2, bg-gl.js)에서 매 프레임: 영상 색을 따라 가장자리를 키우고, 손 마디로 손가락을 지키고,
+//   빛 번짐 · 색 맞추기로 자연스럽게. WebGL2 가 없으면 Canvas2D 로 간단히
 // - 사람은 거울처럼(좌우 반전) 그리고, 그림 · 사진 배경은 뒤집지 않음 (글자가 거꾸로 되지 않게)
 import { getRaw, setRaw, remove } from './storage.js';
+import { SEG_MODEL, createMaskFilter, handCapsules, coverRect, tintFromMean } from './bg-mask.js';
+import { createGLCompositor } from './bg-gl.js';
+import { paintScene } from './bg-scenes.js';
+
+export { paintScene };
 
 const WASM_PATH = new URL('../../../node_modules/@mediapipe/tasks-vision/wasm', import.meta.url).href;
-const MODEL_PATH = new URL('../../../models/selfie_segmenter.tflite', import.meta.url).href;
+const MODEL_PATH = new URL(`../../../models/${SEG_MODEL.file}`, import.meta.url).href;
 const BUNDLE = '../../../node_modules/@mediapipe/tasks-vision/vision_bundle.mjs';
+const WORKER_URL = new URL('./bg-worker.js', import.meta.url).href;
 
 export const BG_MODES = [
   ['none', '원래대로'],
@@ -38,7 +45,7 @@ export const BG_SCENES = [
 const PHOTO_KEY = 'bgPhoto';
 export const PHOTO_MAX_CHARS = 1_800_000; // localStorage 를 너무 많이 차지하지 않게 (JPEG 약 1.3MB)
 const OUT_MAX_W = 960; // 합성 화면 크기 (영상이 더 커도 이만큼만)
-const SEG_W = 256; // 사람 찾기는 작은 크기로
+const HANDS_MAX_AGE = 400; // ms: 이보다 오래된 손 마디는 쓰지 않음
 
 function makeCanvas(w, h) {
   const c = document.createElement('canvas');
@@ -47,89 +54,6 @@ function makeCanvas(w, h) {
   return c;
 }
 
-// 시드가 있는 의사 난수 (그림 배경이 매번 같게)
-function rng(seed) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  };
-}
-
-/** 코드로 만드는 그림 배경 (저작권 걱정 없는 부드러운 그라데이션 · 무늬, 차가운 색 위주라 손과 잘 구별됨) */
-export function paintScene(ctx, id, w, h) {
-  const r = rng(id.length * 977 + id.charCodeAt(0) * 31);
-  const lin = (stops, x0 = 0, y0 = 0, x1 = 0, y1 = h) => {
-    const g = ctx.createLinearGradient(x0, y0, x1, y1);
-    stops.forEach(([o, c]) => g.addColorStop(o, c));
-    return g;
-  };
-  const blob = (x, y, rad, color) => {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, color);
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-  };
-  ctx.save();
-  if (id === 'sky') {
-    ctx.fillStyle = lin([[0, '#3f78b5'], [0.7, '#86b6de'], [1, '#b9d6ec']]);
-    ctx.fillRect(0, 0, w, h);
-    for (let i = 0; i < 9; i++) {
-      const x = r() * w;
-      const y = h * (0.1 + r() * 0.45);
-      for (let k = 0; k < 4; k++) blob(x + (k - 1.5) * w * 0.05, y + (r() - 0.5) * h * 0.04, w * (0.06 + r() * 0.05), 'rgba(255,255,255,0.35)');
-    }
-  } else if (id === 'mint') {
-    ctx.fillStyle = lin([[0, '#2f7f78'], [1, '#1c514d']], 0, 0, w, h);
-    ctx.fillRect(0, 0, w, h);
-    for (let i = 0; i < 14; i++) blob(r() * w, r() * h, w * (0.04 + r() * 0.09), `rgba(190,255,240,${(0.08 + r() * 0.12).toFixed(2)})`);
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.fillRect(0, h * 0.82, w, h * 0.18);
-  } else if (id === 'board') {
-    ctx.fillStyle = '#5b4632';
-    ctx.fillRect(0, 0, w, h);
-    const m = Math.round(w * 0.035);
-    ctx.fillStyle = lin([[0, '#2c4a3c'], [1, '#203a2f']]);
-    ctx.fillRect(m, m, w - m * 2, h - m * 2);
-    ctx.globalAlpha = 0.16;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `700 ${Math.round(h * 0.09)}px "Malgun Gothic", sans-serif`;
-    const jamo = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣ';
-    for (let i = 0; i < 18; i++) ctx.fillText(jamo[Math.floor(r() * jamo.length)], m * 2 + r() * (w - m * 5), m * 3 + r() * (h - m * 5));
-    ctx.globalAlpha = 1;
-  } else if (id === 'forest') {
-    ctx.fillStyle = lin([[0, '#2f5b4a'], [1, '#14302a']]);
-    ctx.fillRect(0, 0, w, h);
-    for (let layer = 0; layer < 3; layer++) {
-      ctx.fillStyle = ['rgba(20,60,45,0.55)', 'rgba(15,45,35,0.65)', 'rgba(10,32,26,0.75)'][layer];
-      for (let i = 0; i < 9; i++) ctx.fillRect(r() * w, 0, w * (0.025 + r() * 0.03), h);
-    }
-    for (let i = 0; i < 10; i++) blob(r() * w, r() * h * 0.6, w * (0.03 + r() * 0.05), 'rgba(210,240,200,0.12)');
-  } else if (id === 'dusk') {
-    ctx.fillStyle = lin([[0, '#2a2f5c'], [0.6, '#5b4a86'], [1, '#8a6a9e']]);
-    ctx.fillRect(0, 0, w, h);
-    blob(w * 0.78, h * 0.78, w * 0.3, 'rgba(255,200,230,0.18)');
-    ctx.fillStyle = 'rgba(20,20,45,0.55)';
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    for (let x = 0; x <= w + 1; x += w / 12) ctx.lineTo(x, h * (0.8 + r() * 0.08));
-    ctx.lineTo(w, h);
-    ctx.fill();
-  } else {
-    // night
-    ctx.fillStyle = lin([[0, '#0d1530'], [1, '#1d2b52']]);
-    ctx.fillRect(0, 0, w, h);
-    const u = Math.max(1, w / 1280);
-    for (let i = 0; i < 140; i++) {
-      ctx.fillStyle = `rgba(255,255,255,${(0.25 + r() * 0.6).toFixed(2)})`;
-      const s = (r() < 0.9 ? 1.2 : 2.4) * u;
-      ctx.fillRect(r() * w, r() * h * 0.85, s, s);
-    }
-    blob(w * 0.18, h * 0.2, w * 0.07, 'rgba(255,250,220,0.5)');
-  }
-  ctx.restore();
-}
 
 // 자동 점검용 가짜 사람 (진짜 카메라를 쓰지 않으므로): 벽 앞의 얼굴 · 어깨
 function drawTestPerson(ctx, w, h, t) {
@@ -165,12 +89,18 @@ function drawTestPerson(ctx, w, h, t) {
   ctx.stroke();
 }
 
+
 /**
  * @param {{ video: HTMLVideoElement, settings: object, synthetic?: boolean, toast?: Function }} o
  */
-export function createBackground({ video, settings, synthetic = false, toast = () => {} }) {
+export function createBackground({ video, settings, synthetic = false, toast = () => {}, useWorker = true }) {
   const views = new Set(); // 붙어 있는 화면 캔버스들
   let segmenter = null;
+  let worker = null;
+  let pending = null; // 워커에 보낸 뒤 결과를 기다리는 것
+  let segId = 0;
+  let segLatency = 0;
+  let srcGen = 0; // 영상 바뀔 때마다 늘림
   let loadPromise = null;
   let status = 'off'; // 'off' | 'loading' | 'ready' | 'error'
   let delegate = '';
@@ -181,29 +111,56 @@ export function createBackground({ video, settings, synthetic = false, toast = (
   let segCost = 0;
   let segCount = 0;
   let frameCount = 0;
+  let composeCost = 0;
+  let fps = 0;
+  let fpsFrames = 0;
+  let fpsT = performance.now();
   let failCount = 0;
   let warned = false;
+  let lastVideoTime = -1;
+  let dirty = true;
   const statusCbs = new Set();
 
   let outW = 0;
   let outH = 0;
-  const segCanvas = makeCanvas(SEG_W, 144);
-  const segCtx = segCanvas.getContext('2d');
-  const maskCanvas = makeCanvas(SEG_W, 144);
+  const SW = SEG_MODEL.w;
+  const SH = SEG_MODEL.h;
+  const segCanvas = makeCanvas(SW, SH);
+  const segCtx = segCanvas.getContext('2d', { willReadFrequently: true });
+  const filter = createMaskFilter(SW, SH);
+  const prob = new Float32Array(SW * SH);
+  const luma = new Uint8Array(SW * SH);
+  let hasMask = false;
+
+  // 손 마디 (원본 영상 기준 0~1)
+  let hands = [];
+  let handsAt = -1e9;
+  let caps = { caps: null, count: 0 };
+
+  // 합성기: WebGL2 → 안 되면 Canvas2D
+  let gl = null;
+  let glTried = false;
+  let glError = '';
+  // Canvas2D 로 할 때 쓰는 것들
+  const maskCanvas = makeCanvas(SW, SH);
   const maskCtx = maskCanvas.getContext('2d');
   let maskData = null;
-  let prevMask = null;
-  let hasMask = false;
-  let personShare = 0; // 사람으로 본 넓이 비율 (점검용)
+  let lastMask = null;
   const person = makeCanvas(16, 9);
   const personCtx = person.getContext('2d');
   const blurSmall = makeCanvas(16, 9);
   const blurCtx = blurSmall.getContext('2d');
-  const sceneCache = new Map();
+
+  // 배경 그림 (화면 크기로 cover 맞춤)
+  const bgCanvas = makeCanvas(16, 9);
+  const bgCtx = bgCanvas.getContext('2d', { willReadFrequently: true });
+  let bgKey = '';
+  let tint = [1, 1, 1];
   let photoImg = null;
   let photoLoaded = null;
 
-  // 점검용 가짜 영상
+  // 점검용 영상: 가짜 사람(기본) 또는 setTestSource 로 넣은 사진
+  let testSrc = null; // { el, canvas, hands, motion, shift }
   const testCanvas = synthetic ? makeCanvas(640, 360) : null;
   const testCtx = testCanvas ? testCanvas.getContext('2d') : null;
 
@@ -229,7 +186,16 @@ export function createBackground({ video, settings, synthetic = false, toast = (
     return m === 'photo' && !hasPhoto() ? 'none' : m;
   }
 
-  function source() {
+  function source(now) {
+    if (testSrc) {
+      const c = testSrc.canvas;
+      // 사진을 아주 조금씩 좌우로 움직여 실제 영상처럼 (움직임 판단 · 떨림 확인용)
+      const sx = 1.02;
+      const dx = (testSrc.motion ? Math.sin(now / 600) * 0.006 : 0) - 0.01;
+      testSrc.shift = { dx, sx };
+      c.getContext('2d').drawImage(testSrc.el, dx * c.width, 0, c.width * sx, c.height);
+      return { el: c, w: c.width, h: c.height };
+    }
     if (testCanvas) return { el: testCanvas, w: testCanvas.width, h: testCanvas.height };
     if (video.readyState >= 2 && video.videoWidth > 0) return { el: video, w: video.videoWidth, h: video.videoHeight };
     return null;
@@ -240,6 +206,19 @@ export function createBackground({ video, settings, synthetic = false, toast = (
     if (loadPromise) return loadPromise;
     setStatus('loading');
     loadPromise = (async () => {
+      // 1) 따로 일하는 곳(워커)에서 → 화면이 멈칫하지 않음
+      if (useWorker && typeof Worker === 'function') {
+        try {
+          worker = await startWorker();
+          setStatus('ready');
+          kick();
+          return worker;
+        } catch (err) {
+          console.warn('배경: 워커를 못 써서 화면 쪽에서 사람을 찾아요', err && err.message);
+          worker = null;
+        }
+      }
+      // 2) 화면 쪽(메인 스레드)에서
       const { FilesetResolver, ImageSegmenter } = await import(BUNDLE);
       const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
       const make = (d) =>
@@ -268,6 +247,55 @@ export function createBackground({ video, settings, synthetic = false, toast = (
     return loadPromise;
   }
 
+  function startWorker() {
+    return new Promise((resolve, reject) => {
+      let w;
+      try {
+        w = new Worker(WORKER_URL);
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      const timer = setTimeout(() => {
+        w.terminate();
+        reject(new Error('워커 준비 시간 초과'));
+      }, 30000);
+      w.onmessage = (e) => {
+        const m = e.data || {};
+        if (m.type === 'ready') {
+          clearTimeout(timer);
+          delegate = `${m.delegate} (worker)`;
+          w.onmessage = onWorkerMessage;
+          resolve(w);
+        } else if (m.type === 'error') {
+          clearTimeout(timer);
+          w.terminate();
+          reject(new Error(m.message));
+        }
+      };
+      w.onerror = (e) => {
+        clearTimeout(timer);
+        w.terminate();
+        reject(new Error(e.message || '워커 오류'));
+      };
+      w.postMessage({ type: 'init', wasm: WASM_PATH, model: MODEL_PATH });
+    });
+  }
+
+  function onWorkerMessage(e) {
+    const m = e.data || {};
+    if (!pending || m.id !== pending.id) return;
+    const p = pending;
+    pending = null;
+    if (m.type !== 'mask') return;
+    if (segCount >= 2) segCost = segCost ? segCost * 0.8 + m.cost * 0.2 : m.cost;
+    segLatency = performance.now() - p.t;
+    segEvery = Math.min(160, Math.max(33, segCost * 1.2));
+    segCount++;
+    if (p.gen !== srcGen) return; // 그사이 영상이 바뀜
+    applyMask(m.mask, p.luma, p.px);
+  }
+
   function fail() {
     setStatus('error');
     hideAll();
@@ -281,18 +309,37 @@ export function createBackground({ video, settings, synthetic = false, toast = (
     for (const c of views) c.hidden = true;
   }
 
+  function compositor() {
+    if (!glTried) {
+      glTried = true;
+      try {
+        gl = createGLCompositor();
+      } catch (err) {
+        glError = String(err && err.message);
+        console.warn('배경: WebGL2 합성을 못 써서 간단한 방식으로 해요', err);
+        gl = null;
+      }
+    }
+    if (gl && gl.lost) {
+      gl = null;
+      glError = 'context lost';
+    }
+    return gl;
+  }
+
   // ───────── 사람 찾기 ─────────
   function segment(src, now) {
-    const sh = Math.max(8, Math.round((SEG_W * src.h) / src.w));
-    if (segCanvas.height !== sh) {
-      segCanvas.height = sh;
-      maskCanvas.height = sh;
-      maskData = null;
-      prevMask = null;
-    }
-    segCtx.drawImage(src.el, 0, 0, SEG_W, sh);
+    segCtx.drawImage(src.el, 0, 0, SW, SH);
+    const px = segCtx.getImageData(0, 0, SW, SH).data;
+    for (let i = 0, j = 0; i < luma.length; i++, j += 4) luma[i] = (px[j] * 77 + px[j + 1] * 150 + px[j + 2] * 29) >> 8;
     const ts = Math.max(Math.round(now), lastTs + 1);
     lastTs = ts;
+    if (worker) {
+      // 결과는 onWorkerMessage 에서 (한 번에 하나만 보냄)
+      pending = { id: ++segId, t: performance.now(), luma: luma.slice(), px, gen: srcGen };
+      worker.postMessage({ type: 'seg', id: segId, ts, w: SW, h: SH, buf: px.buffer.slice(0) });
+      return;
+    }
     const t0 = performance.now();
     segmenter.segmentForVideo(segCanvas, ts, (res) => {
       const masks = res && res.confidenceMasks;
@@ -300,29 +347,9 @@ export function createBackground({ video, settings, synthetic = false, toast = (
       // 가면이 1장이면 '사람일 확률', 여러 장이면 0번이 배경
       const single = masks.length === 1;
       const data = masks[0].getAsFloat32Array();
-      const n = Math.min(data.length, SEG_W * sh);
-      if (!maskData || maskData.height !== sh) maskData = maskCtx.createImageData(SEG_W, sh);
-      if (!prevMask || prevMask.length !== n) prevMask = new Float32Array(n);
-      const px = maskData.data;
-      let sum = 0;
-      for (let i = 0; i < n; i++) {
-        let p = single ? data[i] : 1 - data[i];
-        // 부드러운 경계 (0.3 ~ 0.7 사이를 매끄럽게)
-        p = Math.min(1, Math.max(0, (p - 0.3) / 0.4));
-        p = p * p * (3 - 2 * p);
-        // 떨림 줄이기: 앞 프레임과 섞음
-        const v = prevMask[i] * 0.35 + p * 0.65;
-        prevMask[i] = v;
-        sum += v;
-        const j = i * 4;
-        px[j] = 255;
-        px[j + 1] = 255;
-        px[j + 2] = 255;
-        px[j + 3] = v * 255;
-      }
-      personShare = sum / n;
-      maskCtx.putImageData(maskData, 0, 0);
-      hasMask = true;
+      const p = new Float32Array(data.length);
+      for (let i = 0; i < data.length; i++) p[i] = single ? data[i] : 1 - data[i];
+      applyMask(p, luma, px);
     });
     const cost = performance.now() - t0;
     // 처음 몇 번은 GPU 준비(셰이더) 때문에 아주 느림 → 빼고 셈
@@ -332,19 +359,31 @@ export function createBackground({ video, settings, synthetic = false, toast = (
     segCount++;
   }
 
-  // ───────── 배경 그리기 ─────────
-  function sceneCanvas(id) {
-    const key = `${id}:${outW}x${outH}`;
-    let c = sceneCache.get(key);
-    if (!c) {
-      c = makeCanvas(outW, outH);
-      paintScene(c.getContext('2d'), id, outW, outH);
-      sceneCache.clear();
-      sceneCache.set(key, c);
-    }
-    return c;
+  function applyMask(p, lum, px) {
+    const n = Math.min(p.length, prob.length);
+    for (let i = 0; i < n; i++) prob[i] = p[i];
+    const m = filter.update(prob, lum);
+    lastMask = m;
+    const g = compositor();
+    if (g) g.uploadMask(m, px, SW, SH);
+    else putMask2D(m);
+    hasMask = true;
+    dirty = true;
   }
 
+  function putMask2D(m) {
+    if (!maskData) maskData = maskCtx.createImageData(SW, SH);
+    const d = maskData.data;
+    for (let i = 0; i < m.length; i++) {
+      d[i * 4] = 255;
+      d[i * 4 + 1] = 255;
+      d[i * 4 + 2] = 255;
+      d[i * 4 + 3] = m[i];
+    }
+    maskCtx.putImageData(maskData, 0, 0);
+  }
+
+  // ───────── 배경 그림 ─────────
   function loadedPhoto() {
     const url = getRaw(PHOTO_KEY, null);
     if (url !== photoLoaded) {
@@ -352,18 +391,144 @@ export function createBackground({ video, settings, synthetic = false, toast = (
       photoImg = null;
       if (url) {
         photoImg = new Image();
+        photoImg.onload = () => {
+          bgKey = '';
+          dirty = true;
+          kick();
+        };
         photoImg.src = url;
       }
     }
     return photoImg && photoImg.complete && photoImg.naturalWidth ? photoImg : null;
   }
 
-  function drawBackground(ctx, m, src) {
+  /** 그림 · 사진 · 단색 배경을 화면 크기 캔버스에 준비 (바뀔 때만). 바뀌었으면 true */
+  function prepareBackground(m) {
+    const img = m === 'photo' ? loadedPhoto() : null;
+    const what = m === 'color' ? settings.get('bgColor') : m === 'scene' ? settings.get('bgScene') : m === 'photo' ? `${photoLoaded ? photoLoaded.length : 0}:${!!img}` : '';
+    const key = `${m}:${what}:${outW}x${outH}`;
+    if (key === bgKey) return false;
+    bgKey = key;
+    if (bgCanvas.width !== outW || bgCanvas.height !== outH) {
+      bgCanvas.width = outW;
+      bgCanvas.height = outH;
+    }
+    const ctx = bgCtx;
+    ctx.save();
+    if (m === 'color') {
+      ctx.fillStyle = settings.get('bgColor') || BG_COLORS[0][0];
+      ctx.fillRect(0, 0, outW, outH);
+    } else if (m === 'scene') {
+      paintScene(ctx, settings.get('bgScene') || 'sky', outW, outH);
+    } else if (m === 'photo' && img) {
+      // 화상 통화 배경처럼 꽉 차게 (뒤집지 않음)
+      const r = coverRect(img.naturalWidth, img.naturalHeight, outW, outH);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, r.x, r.y, r.w, r.h);
+    } else {
+      ctx.fillStyle = BG_COLORS[3][0];
+      ctx.fillRect(0, 0, outW, outH);
+    }
+    ctx.restore();
+    // 평균 색 → 사람 색을 살짝 맞춤
+    try {
+      const d = ctx.getImageData(0, 0, outW, outH).data;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let k = 0;
+      for (let i = 0; i < d.length; i += 4 * 97) {
+        r += d[i];
+        g += d[i + 1];
+        b += d[i + 2];
+        k++;
+      }
+      tint = tintFromMean(r / k / 255, g / k / 255, b / k / 255);
+    } catch {
+      tint = [1, 1, 1];
+    }
+    return true;
+  }
+
+  // ───────── 합성 ─────────
+  /** 손 캡슐 (원본 영상 방향, 화면 픽셀 크기 w×h) */
+  function currentCaps(w, h) {
+    let list;
+    if (testSrc) {
+      // 점검용 사진은 움직인 만큼 손 마디도 같이 옮김
+      const s = testSrc.shift || { dx: 0, sx: 1 };
+      list = testSrc.hands.map((hd) => ({ landmarks: hd.landmarks.map((p) => ({ x: s.dx + p.x * s.sx, y: p.y })) }));
+    } else list = performance.now() - handsAt < HANDS_MAX_AGE ? hands : [];
+    caps = handCapsules(list, w, h, caps.caps || undefined);
+    return caps;
+  }
+
+  function sizeViews(w, h) {
+    const live = [...views].filter((c) => c.isConnected);
+    for (const c of live) {
+      if (c.width !== w || c.height !== h) {
+        c.width = w;
+        c.height = h;
+      }
+    }
+    return live;
+  }
+
+  const blurK = () => Math.min(24, Math.max(4, Number(settings.get('bgBlur')) || 12));
+
+  function composeGL(g, src, m, live) {
+    g.resize(outW, outH);
+    g.uploadVideo(src.el);
+    if (m !== 'blur' && (prepareBackground(m) || !g.hasBg)) g.setBackground(bgCanvas);
+    const cp = currentCaps(outW, outH);
+    const ok = g.render({
+      mode: m === 'blur' ? 'blur' : 'image',
+      blurPasses: Math.round(blurK() / 3),
+      caps: cp.caps,
+      capCount: cp.count,
+      tint,
+      harmonize: settings.get('bgHarmonize') === false ? 0 : 0.6,
+      wrap: settings.get('bgHarmonize') === false ? 0.08 : 0.32,
+      decon: 0.85,
+    });
+    if (!ok) return false;
+    for (const c of live) c.getContext('2d').drawImage(g.canvas, 0, 0);
+    return true;
+  }
+
+  // WebGL2 가 없을 때: 작은 가면을 흐리게 키우고 손 캡슐을 더해 오려 냄
+  function compose2D(src, m, live) {
+    const w = outW;
+    const h = outH;
+    if (person.width !== w || person.height !== h) {
+      person.width = w;
+      person.height = h;
+    }
+    personCtx.globalCompositeOperation = 'source-over';
+    personCtx.clearRect(0, 0, w, h);
+    personCtx.filter = 'blur(2px)';
+    personCtx.drawImage(maskCanvas, 0, 0, w, h);
+    personCtx.filter = 'none';
+    const cp = currentCaps(w, h);
+    personCtx.strokeStyle = '#fff';
+    personCtx.lineCap = 'round';
+    for (let i = 0; i < cp.count; i++) {
+      const o = i * 6;
+      personCtx.lineWidth = cp.caps[o + 4] * 2.6;
+      personCtx.beginPath();
+      personCtx.moveTo(cp.caps[o], cp.caps[o + 1]);
+      personCtx.lineTo(cp.caps[o + 2], cp.caps[o + 3]);
+      personCtx.stroke();
+    }
+    personCtx.globalCompositeOperation = 'source-in';
+    personCtx.drawImage(src.el, 0, 0, w, h);
+    personCtx.globalCompositeOperation = 'source-over';
+    const ctx = live[0].getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (m === 'blur') {
-      // 작게 줄였다가 키우면 값싸게 흐려짐 + 조금 더 흐림
-      const k = Math.min(24, Math.max(4, Number(settings.get('bgBlur')) || 12));
-      const bw = Math.max(16, Math.round(outW / 6));
-      const bh = Math.max(9, Math.round(outH / 6));
+      const k = blurK();
+      const bw = Math.max(16, Math.round(w / 6));
+      const bh = Math.max(9, Math.round(h / 6));
       if (blurSmall.width !== bw || blurSmall.height !== bh) {
         blurSmall.width = bw;
         blurSmall.height = bh;
@@ -372,67 +537,54 @@ export function createBackground({ video, settings, synthetic = false, toast = (
       blurCtx.drawImage(src.el, 0, 0, bw, bh);
       blurCtx.filter = 'none';
       ctx.save();
-      ctx.setTransform(-1, 0, 0, 1, outW, 0); // 영상이니 거울처럼
+      ctx.setTransform(-1, 0, 0, 1, w, 0);
       ctx.filter = `blur(${Math.round(k / 3)}px)`;
-      ctx.drawImage(blurSmall, -outW * 0.03, -outH * 0.03, outW * 1.06, outH * 1.06);
+      ctx.drawImage(blurSmall, -w * 0.03, -h * 0.03, w * 1.06, h * 1.06);
       ctx.restore();
-    } else if (m === 'color') {
-      ctx.fillStyle = settings.get('bgColor') || BG_COLORS[0][0];
-      ctx.fillRect(0, 0, outW, outH);
-    } else if (m === 'scene') {
-      ctx.drawImage(sceneCanvas(settings.get('bgScene') || 'sky'), 0, 0);
-    } else if (m === 'photo') {
-      const img = loadedPhoto();
-      if (img) {
-        const s = Math.max(outW / img.naturalWidth, outH / img.naturalHeight);
-        const w = img.naturalWidth * s;
-        const h = img.naturalHeight * s;
-        ctx.drawImage(img, (outW - w) / 2, (outH - h) / 2, w, h);
-      } else {
-        ctx.fillStyle = BG_COLORS[3][0];
-        ctx.fillRect(0, 0, outW, outH);
-      }
+    } else {
+      prepareBackground(m);
+      ctx.drawImage(bgCanvas, 0, 0);
     }
-  }
-
-  function compose(src) {
-    const w = Math.min(OUT_MAX_W, src.w);
-    const h = Math.round((w * src.h) / src.w);
-    const live = [...views].filter((c) => c.isConnected);
-    if (!live.length) return;
-    outW = w;
-    outH = h;
-    for (const c of live) {
-      if (c.width !== w || c.height !== h) {
-        c.width = w;
-        c.height = h;
-      }
-    }
-    if (person.width !== w || person.height !== h) {
-      person.width = w;
-      person.height = h;
-    }
-    // 1) 사람만 오려 냄 (원본 방향 그대로)
-    personCtx.globalCompositeOperation = 'source-over';
-    personCtx.clearRect(0, 0, w, h);
-    personCtx.drawImage(src.el, 0, 0, w, h);
-    personCtx.globalCompositeOperation = 'destination-in';
-    personCtx.filter = 'blur(2px)'; // 가장자리를 살짝 부드럽게
-    personCtx.drawImage(maskCanvas, 0, 0, w, h);
-    personCtx.filter = 'none';
-    personCtx.globalCompositeOperation = 'source-over';
-    // 2) 배경 → 사람(거울)
-    const first = live[0];
-    const ctx = first.getContext('2d');
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    drawBackground(ctx, mode(), src);
     ctx.save();
     ctx.setTransform(-1, 0, 0, 1, w, 0);
     ctx.drawImage(person, 0, 0);
     ctx.restore();
-    for (const c of live.slice(1)) c.getContext('2d').drawImage(first, 0, 0);
+    for (const c of live.slice(1)) c.getContext('2d').drawImage(live[0], 0, 0);
+    return true;
+  }
+
+  function compose(src, m) {
+    const w = Math.min(OUT_MAX_W, src.w);
+    const h = Math.round((w * src.h) / src.w);
+    const live = sizeViews(w, h);
+    if (!live.length) return;
+    outW = w;
+    outH = h;
+    const t0 = performance.now();
+    const g = compositor();
+    let ok = false;
+    if (g) {
+      try {
+        ok = composeGL(g, src, m, live);
+      } catch (err) {
+        console.warn('배경: WebGL2 합성 실패 → 간단한 방식으로', err);
+        glError = String(err && err.message);
+        gl = null;
+        if (lastMask) putMask2D(lastMask);
+      }
+    }
+    if (!ok && !gl) ok = compose2D(src, m, live);
+    if (!ok) return;
+    const now = performance.now();
+    composeCost = composeCost ? composeCost * 0.9 + (now - t0) * 0.1 : now - t0;
     for (const c of live) c.hidden = false;
     frameCount++;
+    fpsFrames++;
+    if (now - fpsT >= 1000) {
+      fps = (fpsFrames * 1000) / (now - fpsT);
+      fpsFrames = 0;
+      fpsT = now;
+    }
   }
 
   function tick() {
@@ -449,16 +601,22 @@ export function createBackground({ video, settings, synthetic = false, toast = (
       return;
     }
     const now = performance.now();
-    if (testCtx) drawTestPerson(testCtx, testCanvas.width, testCanvas.height, now);
-    const src = source();
+    if (testCtx && !testSrc) drawTestPerson(testCtx, testCanvas.width, testCanvas.height, now);
+    const src = source(now);
     if (src) {
       try {
-        if (now - lastSegAt >= segEvery) {
+        // 진짜 카메라는 새 프레임이 왔을 때만 (같은 그림을 두 번 그리지 않게)
+        const fresh = src.el !== video || video.currentTime !== lastVideoTime;
+        if (src.el === video) lastVideoTime = video.currentTime;
+        if (pending && now - pending.t > 2000) pending = null; // 워커가 답이 없으면 다시 보냄
+        if (fresh && !pending && now - lastSegAt >= segEvery) {
           lastSegAt = now;
           segment(src, now);
         }
-        if (hasMask) compose(src);
-        else hideAll();
+        if (hasMask && (fresh || dirty)) {
+          dirty = false;
+          compose(src, m);
+        } else if (!hasMask) hideAll();
         failCount = 0;
       } catch (err) {
         console.error('배경 합성 실패', err);
@@ -483,6 +641,7 @@ export function createBackground({ video, settings, synthetic = false, toast = (
       warned = false;
       setStatus('off');
     }
+    dirty = true;
     if (mode() === 'none') hideAll();
     kick();
   });
@@ -510,6 +669,8 @@ export function createBackground({ video, settings, synthetic = false, toast = (
     }
     if (url.length > PHOTO_MAX_CHARS) throw new Error('사진이 너무 커요');
     if (!setRaw(PHOTO_KEY, url)) throw new Error('저장 공간이 모자라요');
+    bgKey = '';
+    dirty = true;
     kick();
     return url.length;
   }
@@ -518,6 +679,7 @@ export function createBackground({ video, settings, synthetic = false, toast = (
     remove(PHOTO_KEY);
     photoLoaded = null;
     photoImg = null;
+    bgKey = '';
     if (settings.get('bg') === 'photo') settings.set('bg', 'none');
   }
 
@@ -526,11 +688,31 @@ export function createBackground({ video, settings, synthetic = false, toast = (
     mount(canvas) {
       canvas.hidden = true;
       views.add(canvas);
+      dirty = true;
       kick();
       return () => {
         views.delete(canvas);
         canvas.hidden = true;
       };
+    },
+    /** 손 인식 결과(원본 영상 기준 손 마디)를 받음 → 손가락이 배경에 묻히지 않게 지킴 */
+    setHands(list) {
+      hands = Array.isArray(list) ? list : [];
+      handsAt = performance.now();
+    },
+    /**
+     * 점검용: 카메라 대신 그림(사진)을 영상으로 씀. null 이면 원래대로
+     * @param {HTMLCanvasElement|HTMLImageElement|null} el
+     * @param {{ hands?: Array, motion?: boolean }} [o]
+     */
+    setTestSource(el, o = {}) {
+      testSrc = el ? { el, canvas: makeCanvas(el.naturalWidth || el.width, el.naturalHeight || el.height), hands: o.hands || [], motion: !!o.motion, shift: null } : null;
+      filter.reset();
+      srcGen++;
+      pending = null;
+      hasMask = false;
+      dirty = true;
+      kick();
     },
     mode,
     hasPhoto,
@@ -546,6 +728,22 @@ export function createBackground({ video, settings, synthetic = false, toast = (
       return status;
     },
     /** 점검용 수치 */
-    stats: () => ({ status, delegate, segCount, frameCount, segCost: Math.round(segCost * 10) / 10, segEvery: Math.round(segEvery), hasMask, personShare: Math.round(personShare * 1000) / 1000, mode: mode() }),
+    stats: () => ({
+      status,
+      delegate,
+      model: SEG_MODEL.file,
+      compositor: gl ? 'webgl2' : glTried ? `canvas2d${glError ? ` (${glError.slice(0, 80)})` : ''}` : '',
+      segCount,
+      frameCount,
+      fps: Math.round(fps * 10) / 10,
+      segCost: Math.round(segCost * 10) / 10,
+      segLatency: Math.round(segLatency),
+      composeCost: Math.round(composeCost * 10) / 10,
+      segEvery: Math.round(segEvery),
+      hasMask,
+      hands: caps.count,
+      personShare: Math.round(filter.share * 1000) / 1000,
+      mode: mode(),
+    }),
   };
 }

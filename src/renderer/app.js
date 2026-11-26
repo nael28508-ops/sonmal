@@ -221,6 +221,7 @@ window.addEventListener('hashchange', () => {
 
 // 손 인식 프레임은 지금 화면에만
 vision.onFrame((frame) => {
+  background.setHands(frame.hands); // 가상 배경이 손가락을 지키게 손 마디를 넘겨 줌
   if (current && current.screen.onFrame) current.screen.onFrame(frame);
 });
 

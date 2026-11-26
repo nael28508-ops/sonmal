@@ -31,7 +31,9 @@ Learn 수어는 카메라로 내 손을 보고 손가락 하나하나를 짚어 
 | 선생님 손 등록 | 농인 강사나 선생님의 손 모양을 3초씩 녹화해 판정 기준으로 삼고, 파일로 다른 컴퓨터와 나눌 수 있어요. |
 | 설정 | 카메라, **카메라 배경**, 주로 쓰는 손(왼손잡이), 판정 엄격도, 음성, 소리 없는 모드, 글자 크기, 고대비, 어두운 화면. |
 
-**카메라 배경 (가상 배경)**: 화상 통화처럼 카메라 화면 속 내 뒤쪽을 **흐리게 · 단색 · 그림(6가지) · 내 사진**으로 바꿀 수 있어요. 설정이나 카메라 화면 오른쪽 아래 “배경” 단추로 골라요. 화면에 보이는 모습만 바뀌고 손 인식은 원래 영상으로 하므로 판정에는 영향이 없어요. 내 사진은 1280×720 안으로 줄여 이 컴퓨터에만 저장해요. 사람 영역 찾기는 컴퓨터 성능에 따라 가장자리가 조금 번지거나 늦을 수 있어요.
+**카메라 배경 (가상 배경)**: 화상 통화처럼 카메라 화면 속 내 뒤쪽을 **흐리게 · 단색 · 그림(6가지) · 내 사진**으로 바꿀 수 있어요. 설정이나 카메라 화면 오른쪽 아래 “배경” 단추로 골라요. 화면에 보이는 모습만 바뀌고 손 인식은 원래 영상으로 하므로 판정에는 영향이 없어요. 내 사진은 1280×720 안으로 줄여 이 컴퓨터에만 저장해요. 화상 통화(줌) 배경처럼 자연스럽게 보이도록, 사람 가장자리를 영상 색에 맞춰 다듬고(머리카락 · 어깨), 손 인식 결과로 **손가락과 손목을 늘 또렷하게** 지켜요(수어 앱이라서). 흐리게는 사람을 뺀 뒤쪽만 흐려서 몸 둘레에 번진 테두리가 생기지 않고, 그림 · 사진 배경에서는 가장자리 빛 번짐과 은은한 색 맞추기(설정에서 끌 수 있어요)로 붙여 넣은 티가 덜 나요. 내 사진은 화면을 꽉 채우게 놓고 뒤집지 않아요. 합성은 그래픽 카드(WebGL2)로 하고 사람 찾기는 따로 돌려서 화면이 멈칫하지 않아요(그래픽 카드를 못 쓰면 간단한 방식으로 바뀌어요). 뒤쪽 벽과 옷 · 머리 색이 아주 비슷하거나 아주 빨리 움직이면 가장자리가 잠깐 번질 수 있어요.
+
+![카메라 배경: 예전 방식과 새 방식 비교](docs/screenshots/24-background-before-after.png)
 
 담긴 내용: **자음 14 · 쌍자음 5 · 모음 21(이중 모음 포함) · 숫자 0~10**, 모두 51개.
 
@@ -89,5 +91,6 @@ npm run selftest  # 숨김 창에서 가짜 손으로 모든 화면을 돌려 �
 
 - 지문자·지숫자의 손 모양: **국립국어원 한국수어사전** (https://sldict.korean.go.kr)의 수형 설명과 사진을 기준으로 정리했어요. 글자마다 해당 사전 항목 링크가 들어 있어요.
 - 손 인식: [MediaPipe](https://developers.google.com/mediapipe) Hand Landmarker (`models/hand_landmarker.task`, Apache License 2.0).
-- 카메라 배경의 사람 영역 찾기: MediaPipe Selfie Segmenter (`models/selfie_segmenter.tflite`, Apache License 2.0). 그림 배경은 프로그램 코드로 그려요.
+- 카메라 배경의 사람 영역 찾기: MediaPipe Selfie Segmenter (landscape) (`models/selfie_segmenter_landscape.tflite`, Apache License 2.0). 그림 배경은 프로그램 코드로 그려요.
+- 점검용 사진(`tests/assets`, CC0 퍼블릭 도메인, Wikimedia Commons): [Een zwaaiende man (non-verbale groet)](https://commons.wikimedia.org/wiki/File:Een_zwaaiende_man_(non-verbale_groet).jpg), [Stefan Rahmstorf and sign language interpreter … 2025-11-14 03](https://commons.wikimedia.org/wiki/File:Stefan_Rahmstorf_and_sign_language_interpreter_speaking_at_FridaysForFuture_protest_Berlin_2025-11-14_03.jpg). 자동 점검에서 카메라 대신 써요.
 - 프로그램 코드: [MIT License](LICENSE).

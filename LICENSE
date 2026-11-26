@@ -21,6 +21,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ---
-models/hand_landmarker.task and models/selfie_segmenter.tflite are from Google
-MediaPipe and are licensed under the Apache License, Version 2.0
+models/hand_landmarker.task, models/selfie_segmenter.tflite and
+models/selfie_segmenter_landscape.tflite are from Google MediaPipe and are
+licensed under the Apache License, Version 2.0
 (https://www.apache.org/licenses/LICENSE-2.0).
+
+The test photos in tests/assets are CC0 1.0 (public domain dedication) from
+Wikimedia Commons; see README.md for their source pages.

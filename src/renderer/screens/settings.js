@@ -168,6 +168,7 @@ function backgroundGroup(app) {
   function render() {
     const cur = s.get('bg');
     clear(body);
+    const harmonize = () => row('색 자연스럽게 맞추기', '내 모습의 색과 가장자리 빛을 새 배경에 은은하게 맞춰요. 손 색은 거의 그대로 둬요.', toggle({ label: '색 자연스럽게 맞추기', checked: s.get('bgHarmonize'), onchange: (v) => s.set('bgHarmonize', v) }));
     if (cur === 'blur') {
       const out = h('output.num.setting-rate-out', String(s.get('bgBlur')));
       body.append(
@@ -184,6 +185,7 @@ function backgroundGroup(app) {
           BG_COLORS.map(([c, name]) => swatchBtn(s.get('bgColor').toLowerCase() === c, name, () => { s.set('bgColor', c); render(); }, h('span.bg-swatch-fill', { style: { background: c } }), h('span.bg-swatch-name', name))),
           h('label.bg-swatch.custom', { title: '직접 고르기' }, custom, h('span.bg-swatch-name', '직접 고르기')),
         ),
+        harmonize(),
       );
     } else if (cur === 'scene') {
       body.append(
@@ -193,6 +195,7 @@ function backgroundGroup(app) {
           paintScene(c.getContext('2d'), id, 160, 90);
           return swatchBtn(s.get('bgScene') === id, name, () => { s.set('bgScene', id); render(); }, c, h('span.bg-swatch-name', name));
         })),
+        harmonize(),
       );
     } else if (cur === 'photo' || cur === 'none') {
       const has = bg.hasPhoto();
@@ -203,10 +206,11 @@ function backgroundGroup(app) {
             h('div.stack',
               h('div.row', btn(has ? '다른 사진 고르기' : '사진 고르기', { icon: 'upload', kind: 'soft', size: 'sm', onclick: () => fileInput.click() }),
                 has ? btn('사진 지우기', { icon: 'trash', kind: 'ghost', size: 'sm', onclick: () => { bg.clearPhoto(); app.toast('사진을 지웠어요'); render(); } }) : null),
-              h('div.field-help', '사진은 이 컴퓨터에만 저장돼요. 크면 1280×720 크기로 줄여서 저장해요.'),
+              h('div.field-help', '사진은 이 컴퓨터에만 저장돼요. 크면 1280×720 크기로 줄여서 저장해요. 화면을 꽉 채우게 놓고, 뒤집지 않아요.'),
             ),
           ),
         );
+        if (cur === 'photo') body.append(harmonize());
       }
     }
   }
