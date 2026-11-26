@@ -24,13 +24,20 @@ import teacher from './screens/teacher.js';
 import settingsScreen from './screens/settings.js';
 import help from './screens/help.js';
 import translate from './screens/translate.js';
+import wordlearn from './screens/wordlearn.js';
 
 const host = window.sonmalHost || null;
 const SELFTEST = !!(host && host.isSelftest) || new URLSearchParams(location.search).has('selftest');
 
 // 메뉴 순서 (null = 구분선)
-const SCREENS = [home, learn, practice, words, write, translate, quiz, null, progressScreen, teacher, settingsScreen, help];
-const BY_ID = new Map(SCREENS.filter(Boolean).map((s) => [s.id, s]));
+// 두 갈래: 지문자(손가락 글자) · 단어 수어. { group } 은 메뉴 묶음 이름표
+const FINGER = { group: 'finger', label: '지문자', title: '지문자 (손가락 글자): 한글 자모를 손 모양으로' };
+const WORD = { group: 'word', label: '단어 수어', title: '단어 수어: 뜻마다 정해진 동작' };
+for (const s of [learn, practice, words, write, quiz, teacher]) s.track = s.track || 'finger';
+translate.track = 'finger';
+const SCREENS = [home, FINGER, learn, practice, words, write, quiz, WORD, wordlearn, null, translate, progressScreen, teacher, settingsScreen, help];
+const TRACK_KO = { finger: '지문자 (손가락 글자)', word: '단어 수어' };
+const BY_ID = new Map(SCREENS.filter((s) => s && s.id).map((s) => [s.id, s]));
 
 settings.load();
 if (SELFTEST) document.documentElement.setAttribute('data-motion', 'reduce');
@@ -84,9 +91,13 @@ for (const s of SCREENS) {
     navEl.appendChild(h('span.nav-sep', { 'aria-hidden': 'true' }));
     continue;
   }
+  if (s.group) {
+    navEl.appendChild(h(`span.nav-group.${s.group}`, { title: s.title }, s.label));
+    continue;
+  }
   const badge = h('span.nav-badge');
   badge.hidden = true;
-  const a = h('a.nav-item', { href: `#/${s.id}`, title: s.title }, icon(s.icon), h('span', s.nav || s.title), badge);
+  const a = h(`a.nav-item${s.track ? `.track-${s.track}` : ''}`, { href: `#/${s.id}`, title: s.title }, icon(s.icon), h('span', s.nav || s.title), badge);
   navItems.set(s.id, { a, badge });
   navEl.appendChild(a);
 }
@@ -200,6 +211,9 @@ async function show(id, params) {
     if (sid === screen.id) item.a.setAttribute('aria-current', 'page');
     else item.a.removeAttribute('aria-current');
   }
+  const sub = document.querySelector('.brand-sub');
+  if (sub) sub.textContent = screen.track ? `지금: ${TRACK_KO[screen.track]}` : '지문자 · 단어 수어 배우기';
+  document.body.dataset.track = screen.track || '';
   document.title = screen.id === 'home' ? 'Learn 수어' : `${screen.title} · Learn 수어`;
   try {
     await screen.mount(root, app, params || {});
@@ -287,7 +301,7 @@ if (host && host.log) host.log(`app started (selftest=${SELFTEST})`);
 
 if (SELFTEST) {
   import('./test/selftest.js')
-    .then((m) => m.run(app, { screens: SCREENS.filter(Boolean).map((s) => s.id) }))
+    .then((m) => m.run(app, { screens: SCREENS.filter((s) => s && s.id).map((s) => s.id) }))
     .catch((err) => {
       console.error('selftest crashed', err);
       if (host) host.done({ ok: false, error: String((err && err.stack) || err) });

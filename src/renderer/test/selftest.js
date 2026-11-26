@@ -362,6 +362,33 @@ export async function run(app, { screens }) {
       bg.clearPhoto();
       vision.clearSyntheticPose();
     }
+    if (want('wordlearn')) {
+      // 단어 수어: 카메라 없이 시연 대본으로 판정 (화나다 = 엄지 · 배 → 위로)
+      vision.clearSyntheticPose();
+      await open('wordlearn', { word: 'w1086' }, 600);
+      const scr = app.currentScreen;
+      check('word learn shows official description', !!document.querySelector('.wl-official-text') && /5지/.test(document.querySelector('.wl-official-text').textContent));
+      check('word learn has dictionary link', [...document.querySelectorAll('.wl-mid button')].some((b) => /한국수어사전/.test(b.textContent)));
+      check('word list shows all words', document.querySelectorAll('.wl-item').length >= 80, document.querySelectorAll('.wl-item').length);
+      await sleep(700);
+      await shot('24-word-learn');
+      const okWord = await waitFor(() => document.querySelector('.wl-item.now .wl-done'), 10000);
+      check('word judged by synthetic sequence (화나다)', !!okWord);
+      await shot('25-word-practice-success');
+      scr.setCategory('question');
+      scr.select('w7224');
+      await sleep(900);
+      check('category filter works', document.querySelectorAll('.wl-item').length > 0 && document.querySelectorAll('.wl-item').length < 20);
+      await shot('26-word-question');
+      try {
+        const { createFaceFinder } = await import('../core/face.js');
+        const ff = createFaceFinder(null);
+        const det = await ff.load();
+        check('face detector model loads offline', !!det, ff.error && ff.error.message);
+      } catch (err) {
+        check('face detector model loads offline', false, err && err.message);
+      }
+    }
     if (want('help')) {
       await open('help', {}, 300);
       await shot('14-help');

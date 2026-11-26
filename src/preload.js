@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('sonmalHost', {
   screenshot: (name) => ipcRenderer.invoke('sonmal:screenshot', String(name)),
   /** 자동 점검 결과 보내기 (메인이 SELFTEST_RESULT 를 출력하고 종료) */
   done: (result) => ipcRenderer.send('sonmal:done', plain(result)),
+  /** 한국수어사전 낱말 쪽을 기본 브라우저로 (https://sldict.korean.go.kr/ 만) */
+  openDict: (url) => ipcRenderer.invoke('sonmal:openDict', String(url)),
   log: (msg) => ipcRenderer.send('sonmal:log', String(msg)),
   toggleFullscreen: () => ipcRenderer.send('sonmal:fullscreen'),
   /** 진단 기록 JSON 을 프로젝트의 logs 폴더에 저장하고 경로를 돌려줌 */

@@ -14,7 +14,7 @@ const ROOT = path.resolve(__dirname, '..'); // 프로젝트 폴더 (node_modules
 const ORIGIN = 'app://local';
 const START_PAGE = `${ORIGIN}/src/renderer/index.html`;
 const APP_TITLE = 'Learn 수어';
-const SELFTEST_TIMEOUT_MS = 180000;
+const SELFTEST_TIMEOUT_MS = 300000;
 const SELFTEST_PARTITION = 'sonmal-selftest'; // 'persist:' 가 없으면 메모리에만 저장 → 점검이 진짜 기록을 건드리지 않음
 
 const CSP = [
@@ -196,6 +196,16 @@ ipcMain.handle('sonmal:screenshot', async (event, name) => {
 ipcMain.on('sonmal:done', (event, result) => {
   if (!SELFTEST || !fromAppSender(event)) return;
   finishSelftest(result);
+});
+
+// 단어 수어: 한국수어사전 낱말 쪽만 바깥 브라우저로 열어 줌 (다른 주소는 거절)
+ipcMain.handle('sonmal:openDict', async (event, url) => {
+  if (!fromAppSender(event)) return false;
+  const u = String(url || '');
+  if (!/^https:\/\/sldict\.korean\.go\.kr\/[A-Za-z0-9_\-./?=&%]*$/.test(u)) return false;
+  if (SELFTEST) return true; // 점검 중에는 브라우저를 열지 않음
+  await shell.openExternal(u);
+  return true;
 });
 
 ipcMain.on('sonmal:log', (event, msg) => {

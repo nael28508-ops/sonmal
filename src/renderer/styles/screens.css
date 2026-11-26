@@ -1559,3 +1559,57 @@
 .bg-group .setting-row:has(.segmented) .setting-control {
   justify-content: flex-start;
 }
+
+/* ───────── 두 갈래: 지문자(청록) · 단어 수어(보라) ───────── */
+:root { --track-finger: #0b7a70; --track-word: #6a4fc4; --track-word-soft: rgba(106, 79, 196, 0.12); --track-finger-soft: rgba(11, 122, 112, 0.12); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --track-finger: #5fe0cf; --track-word: #b9a6ff; --track-word-soft: rgba(185, 166, 255, 0.14); --track-finger-soft: rgba(95, 224, 207, 0.12); } }
+:root[data-theme="dark"] { --track-finger: #5fe0cf; --track-word: #b9a6ff; --track-word-soft: rgba(185, 166, 255, 0.14); --track-finger-soft: rgba(95, 224, 207, 0.12); }
+.nav-group { font-size: 11px; font-weight: 800; letter-spacing: 0.02em; padding: 2px 6px; border-radius: 6px; margin: 0 2px 0 8px; align-self: center; white-space: nowrap; }
+.nav-group.finger { color: var(--track-finger); background: var(--track-finger-soft); }
+.nav-group.word { color: var(--track-word); background: var(--track-word-soft); }
+.nav-item.track-word[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--track-word); }
+.nav-item.track-finger[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--track-finger); }
+body[data-track="word"] .brand-sub { color: var(--track-word); font-weight: 700; }
+body[data-track="finger"] .brand-sub { color: var(--track-finger); font-weight: 700; }
+.home-tracks { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.track-card { text-align: left; border-left: 6px solid var(--track-finger); padding: 16px 18px; }
+.track-card.word { border-left-color: var(--track-word); }
+.track-card-head { display: flex; gap: 12px; align-items: center; }
+.track-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--track-finger-soft); color: var(--track-finger); }
+.track-card.word .track-icon { background: var(--track-word-soft); color: var(--track-word); }
+.track-name { font-size: 20px; font-weight: 800; }
+.track-line { font-size: 14px; opacity: 0.85; }
+.track-meta { margin-top: 10px; font-size: 13px; opacity: 0.75; }
+.track-tag { display: inline-flex; gap: 6px; align-items: center; font-weight: 800; font-size: 13px; padding: 3px 8px; border-radius: 8px; }
+.track-tag.word { color: var(--track-word); background: var(--track-word-soft); }
+.help-tracks { margin-bottom: 16px; border-left: 6px solid var(--track-word); }
+
+/* ───────── 단어 배우기 ───────── */
+.work.wordlearn { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(0, 1.05fr); gap: 14px; height: 100%; min-height: 0; }
+.wl-left { display: flex; flex-direction: column; gap: 8px; min-height: 0; padding: 12px; }
+.wl-search { width: 100%; }
+.wl-cats { display: flex; flex-wrap: wrap; gap: 4px; }
+.wl-cat { border: 1px solid transparent; background: var(--track-word-soft); color: inherit; border-radius: 8px; padding: 3px 7px; font-size: 12px; cursor: pointer; display: inline-flex; gap: 4px; }
+.wl-cat.now { border-color: var(--track-word); font-weight: 800; }
+.wl-cat-n { opacity: 0.7; }
+.wl-list { overflow: auto; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.wl-item { display: flex; align-items: center; gap: 6px; text-align: left; border: 0; background: transparent; color: inherit; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 15px; }
+.wl-item:hover, .wl-item:focus-visible { background: var(--track-word-soft); }
+.wl-item.now { background: var(--track-word-soft); font-weight: 800; box-shadow: inset 3px 0 0 var(--track-word); }
+.wl-item-name { flex: 1; }
+.wl-tier { font-size: 11px; padding: 1px 6px; border-radius: 6px; border: 1px solid currentColor; opacity: 0.8; }
+.wl-tier.judged { color: var(--track-finger); }
+.wl-done { color: var(--track-finger); display: inline-flex; }
+.wl-mid { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; padding: 14px; }
+.wl-name { font-size: 34px; margin: 0; }
+.wl-badges { flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.wl-demo-wrap { position: relative; flex: 1 1 260px; min-height: 230px; border-radius: 14px; background: var(--track-word-soft); }
+.wl-demo { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wl-source { border-left: 4px solid var(--track-word); padding: 4px 10px; }
+.wl-official-text { margin: 4px 0; font-size: 15px; line-height: 1.5; }
+.wl-notes { margin: 0; }
+.wl-right { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.wl-right .camera-panel { flex: 1; min-height: 0; }
+.wl-checks .check { font-size: 15px; }
+.track-tag svg { width: 16px; height: 16px; flex: none; }
+.wl-left .track-tag { align-self: flex-start; }

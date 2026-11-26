@@ -22,7 +22,8 @@ SOFTWARE.
 
 ---
 models/hand_landmarker.task, models/selfie_segmenter.tflite and
-models/selfie_segmenter_landscape.tflite are from Google MediaPipe and are
+models/selfie_segmenter_landscape.tflite and models/blaze_face_short_range.tflite
+are from Google MediaPipe and are
 licensed under the Apache License, Version 2.0
 (https://www.apache.org/licenses/LICENSE-2.0).
 

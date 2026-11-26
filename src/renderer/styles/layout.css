@@ -69,7 +69,7 @@
 /* 화면 메뉴: 아이콘 위, 이름 아래 */
 .nav {
   display: flex;
-  justify-content: center;
+  justify-content: safe center;
   align-items: center;
   gap: 2px;
   min-width: 0;
@@ -419,4 +419,15 @@
     padding: var(--sp-6) var(--sp-8) var(--sp-6);
     gap: var(--sp-5);
   }
+}
+
+/* 메뉴가 많아져서(지문자 + 단어 수어) 1440px 이하에서는 더 촘촘하게 — 잘리지 않게 */
+@media (max-width: 1440px) {
+  .brand-text { display: none; }
+  .nav-item { min-width: 50px; padding: 4px 4px 3px; font-size: 11px; }
+  .nav-sep { margin: 0 2px; }
+  .nav-group { margin: 0 1px 0 4px; padding: 2px 4px; font-size: 10px; }
+  .pill-label { display: none; }
+  .pill { padding: 0 9px; }
+  .topbar { gap: 8px; padding: 0 12px; }
 }

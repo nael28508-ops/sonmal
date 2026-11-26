@@ -1,6 +1,7 @@
 // 처음 화면: 이어서 하기 · 단원별 진도 · 오늘 복습할 글자 · 카메라 상태
 import { h, icon, btn } from '../ui/dom.js';
 import { bar, stat, callout } from '../ui/components.js';
+import { WORDS, WORD_CATEGORIES } from '../engine/words-data.js';
 import { units, lettersOfUnit, getLetter, getUnit, allLetters, nameOf, glyphOf, isDemo, UNIT_KIND_KO } from '../core/content.js';
 
 let offState = null;
@@ -121,9 +122,20 @@ export default {
       quickCard(app, 'quiz', 'quiz', '퀴즈', '그림 보고 맞히기 · 손으로 답하기'),
     );
 
+    let wordsDone = 0;
+    try { wordsDone = JSON.parse(localStorage.getItem('sonmal.words.done') || '[]').length; } catch { wordsDone = 0; }
+    const tracks = h('div.home-tracks',
+      h('button.card.interactive.track-card.finger', { type: 'button', onclick: () => app.navigate('learn', contLetter ? { letter: contLetter.id } : {}) },
+        h('div.track-card-head', h('span.track-icon', icon('hand')), h('div', h('div.track-name', '지문자 (손가락 글자)'), h('div.track-line', '한글 자모를 손 모양으로 — 이름 · 새 낱말에 써요'))),
+        h('div.track-meta', `배우기 · 연습 · 낱말 쓰기 · 손으로 쓰기 · 퀴즈 — ${realCount}글자 중 ${mastered}글자 익힘`)),
+      h('button.card.interactive.track-card.word', { type: 'button', onclick: () => app.navigate('wordlearn') },
+        h('div.track-card-head', h('span.track-icon', icon('book')), h('div', h('div.track-name', '단어 수어'), h('div.track-line', '뜻마다 정해진 동작 — 뉴스 · 대화에서 쓰는 수어'))),
+        h('div.track-meta', `단어 배우기 — ${WORD_CATEGORIES.length}갈래 ${WORDS.length}단어 중 ${wordsDone}단어 해 봄`)),
+    );
     root.append(
       h(
         'div.page.home',
+        tracks,
         hero,
         realCount === 0
           ? callout('지금은 카메라와 판정을 확인하는 연습용 손 모양만 들어 있어요. 한국수어 지문자 · 지숫자는 곧 추가돼요.', { tone: 'warm', ic: 'info' })

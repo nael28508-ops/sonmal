@@ -17,6 +17,14 @@ Learn 수어는 카메라로 내 손을 보고 손가락 하나하나를 짚어 
 
 한국수어는 2016년 「한국수화언어법」으로 인정된 농인의 언어예요. 하지만 혼자 배울 때는 내 손 모양이 맞는지 알려 줄 사람이 없어요. Learn 수어가 그 빈자리를 채워요.
 
+## 두 갈래: 지문자와 단어 수어
+
+- **지문자 (손가락 글자)**: 한글 자모를 손 모양으로 나타내요. 이름 · 새 낱말에 써요. 배우기 · 연습 · 낱말 쓰기 · 손으로 쓰기 · 퀴즈.
+- **단어 수어**: 뜻마다 정해진 동작이에요. 뉴스 · 대화에서 쓰는 수어. **단어 배우기** 화면에서 11갈래(인사 · 감정 · 가족 · 시간 · 음식 · 장소 · 학교 · 건강 · 날씨 · 동사 · 질문) 146단어를 갈래별로 보거나 찾고, 손 그림 시연 · 사전 수형 설명 원문 · "한국수어사전에서 영상 보기" 링크를 봐요.
+  - **판정 단어(50개)**: 처음 손 모양 + 몸 위치(얼굴 기준) → 움직임 → 끝 모양을 너그럽게 확인해요.
+  - **보고 따라 하기(96개)**: 처음 손 모양과 위치만 너그럽게 보고, 움직임은 그림과 사전 영상으로 익혀요.
+  - 표정(비수지 신호)은 판정하지 않아요. 단어 설명은 국립국어원 한국수어사전(https://sldict.korean.go.kr) 일상생활 수어의 수형 설명을 그대로 옮겼고, 손 모양 · 위치 · 움직임 부호화는 그 설명을 읽고 옮긴 것이라 사전 영상과 다를 수 있어요.
+
 ## 주요 기능
 
 | 화면 | 하는 일 |
@@ -91,6 +99,8 @@ npm run selftest  # 숨김 창에서 가짜 손으로 모든 화면을 돌려 �
 
 - 지문자·지숫자의 손 모양: **국립국어원 한국수어사전** (https://sldict.korean.go.kr)의 수형 설명과 사진을 기준으로 정리했어요. 글자마다 해당 사전 항목 링크가 들어 있어요.
 - 손 인식: [MediaPipe](https://developers.google.com/mediapipe) Hand Landmarker (`models/hand_landmarker.task`, Apache License 2.0).
+- 단어 수어의 얼굴 위치: MediaPipe Face Detector BlazeFace short range (`models/blaze_face_short_range.tflite`, Apache License 2.0). 단어 배우기 화면에서만 불러와요.
+- 단어 수어 자료: 국립국어원 한국수어사전 (https://sldict.korean.go.kr) 일상생활 수어 수형 설명.
 - 카메라 배경의 사람 영역 찾기: MediaPipe Selfie Segmenter (landscape) (`models/selfie_segmenter_landscape.tflite`, Apache License 2.0). 그림 배경은 프로그램 코드로 그려요.
 - 점검용 사진(`tests/assets`, CC0 퍼블릭 도메인, Wikimedia Commons): [Een zwaaiende man (non-verbale groet)](https://commons.wikimedia.org/wiki/File:Een_zwaaiende_man_(non-verbale_groet).jpg), [Stefan Rahmstorf and sign language interpreter … 2025-11-14 03](https://commons.wikimedia.org/wiki/File:Stefan_Rahmstorf_and_sign_language_interpreter_speaking_at_FridaysForFuture_protest_Berlin_2025-11-14_03.jpg). 자동 점검에서 카메라 대신 써요.
 - 프로그램 코드: [MIT License](LICENSE).
